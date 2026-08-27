@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domain 1 — Agentic Loop Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EFF1EC; --card:#FBFBF8; --ink:#17233D; --ink-soft:#4A5567; --hair:#D9DBD3;
+    --c1:#2C5A7C; --c1bg:#E4EAF0; --good:#2F6B54; --goodbg:#E3ECE7; --bad:#9A3E2E; --badbg:#F3E1DC;
+    --accent:#9A5B1E;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#14181F; --card:#1B212B; --ink:#E9ECF2; --ink-soft:#A7B0C0; --hair:#2C3444;
+      --c1:#7FB0DA; --c1bg:#1E2C3A; --good:#7FCBA6; --goodbg:#1B2E27; --bad:#E39685; --badbg:#33221D;
+      --accent:#D9A05B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#14181F; --card:#1B212B; --ink:#E9ECF2; --ink-soft:#A7B0C0; --hair:#2C3444;
+    --c1:#7FB0DA; --c1bg:#1E2C3A; --good:#7FCBA6; --goodbg:#1B2E27; --bad:#E39685; --badbg:#33221D;
+    --accent:#D9A05B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;
+       display:flex;justify-content:center;padding:28px 16px 60px;-webkit-font-smoothing:antialiased;}
+  .wrap{width:100%;max-width:920px;}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+           color:var(--ink-soft);display:flex;gap:10px;align-items:center;margin-bottom:8px;}
+  .eyebrow::after{content:"";flex:1;height:1px;background:var(--hair);}
+  h1{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:32px;letter-spacing:-.015em;margin-bottom:6px;}
+  .sub{color:var(--ink-soft);font-size:14px;margin-bottom:22px;max-width:640px;line-height:1.5;}
+  .tabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;}
+  .tab{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.03em;padding:9px 14px;
+       border-radius:8px;border:1px solid var(--hair);background:var(--card);color:var(--ink-soft);
+       cursor:pointer;transition:all .15s;}
+  .tab.active{background:var(--c1);color:#fff;border-color:var(--c1);}
+  .panel{display:none;}
+  .panel.active{display:block;}
+  .card{background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:22px 24px;
+        box-shadow:0 18px 44px -30px rgba(0,0,0,.4);}
+  .stage{min-height:260px;display:flex;flex-direction:column;gap:10px;justify-content:center;position:relative;}
+  .controls{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap;}
+  button{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.03em;padding:9px 16px;
+         border-radius:7px;border:1px solid var(--hair);background:var(--paper);color:var(--ink);cursor:pointer;}
+  button.primary{background:var(--c1);color:#fff;border-color:var(--c1);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .step-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-left:auto;}
+  .node{border:1.5px solid var(--hair);border-radius:10px;padding:12px 16px;background:var(--paper);
+        transition:all .25s;opacity:.45;transform:translateY(4px);}
+  .node.active{opacity:1;transform:translateY(0);border-color:var(--c1);background:var(--c1bg);
+               box-shadow:0 0 0 3px color-mix(in srgb, var(--c1) 18%, transparent);}
+  .node.good{border-color:var(--good);background:var(--goodbg);}
+  .node.bad{border-color:var(--bad);background:var(--badbg);}
+  .node-title{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.03em;
+              text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px;}
+  .node.active .node-title{color:var(--c1);}
+  .node-body{font-size:13.5px;line-height:1.5;}
+  code, .mono{font-family:'IBM Plex Mono',monospace;font-size:12.5px;background:rgba(120,120,120,.12);
+              padding:1px 5px;border-radius:4px;}
+  .arrow{text-align:center;color:var(--ink-soft);font-size:18px;opacity:.5;}
+  .row{display:flex;gap:14px;}
+  .row > .node{flex:1;}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.55;margin-top:14px;padding-top:14px;
+        border-top:1px solid var(--hair);}
+  .note b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">CCAR-F · Domain 1 — Agentic Architecture &amp; Orchestration</div>
+  <h1>Agentic Loop Visualizer</h1>
+  <p class="sub">Step through what actually happens on the wire for each Domain 1 task statement.
+     No live API calls here — this replays a fixed, realistic trace so you can see the mechanism
+     without spending tokens. Run the labs in <code>../labs/</code> to see it live.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-panel="loop">1.1 — Agentic Loop</button>
+    <button class="tab" data-panel="coord">1.2/1.3 — Coordinator &amp; Subagents</button>
+    <button class="tab" data-panel="hook">1.4/1.5 — Enforcement Hook</button>
+  </div>
+
+  <!-- ===================== PANEL 1: AGENTIC LOOP ===================== -->
+  <div class="panel active" id="panel-loop">
+    <div class="card">
+      <div class="stage" id="loop-stage"></div>
+      <div class="controls">
+        <button id="loop-prev">&larr; Prev</button>
+        <button id="loop-next" class="primary">Next &rarr;</button>
+        <button id="loop-play">▶ Auto-play</button>
+        <span class="step-label" id="loop-label"></span>
+      </div>
+      <div class="note">
+        Watch <code>stop_reason</code>. <b>tool_use</b> means execute the requested tool(s) and
+        append a <code>tool_result</code> block matched by the exact <code>tool_use_id</code>, then
+        call again. <b>end_turn</b> means stop — not a hardcoded turn cap, not text-parsing.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL 2: COORDINATOR ===================== -->
+  <div class="panel" id="panel-coord">
+    <div class="card">
+      <div class="stage" id="coord-stage"></div>
+      <div class="controls">
+        <button id="coord-prev">&larr; Prev</button>
+        <button id="coord-next" class="primary">Next &rarr;</button>
+        <button id="coord-play">▶ Auto-play</button>
+        <span class="step-label" id="coord-label"></span>
+      </div>
+      <div class="note">
+        Hub-and-spoke: the coordinator, not the subagents, owns all routing. Each subagent gets
+        <b>only what's in its prompt</b> — no automatic inheritance of the coordinator's history.
+        Multiple <code>Agent</code>/<code>Task</code> tool calls emitted in <b>one</b> coordinator
+        turn run in parallel; across separate turns, they'd run sequentially.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== PANEL 3: HOOK ===================== -->
+  <div class="panel" id="panel-hook">
+    <div class="card">
+      <div class="stage" id="hook-stage"></div>
+      <div class="controls">
+        <button id="hook-prev">&larr; Prev</button>
+        <button id="hook-next" class="primary">Next &rarr;</button>
+        <button id="hook-play">▶ Auto-play</button>
+        <span class="step-label" id="hook-label"></span>
+      </div>
+      <div class="note">
+        A <code>PreToolUse</code> hook runs <b>before</b> the tool executes and can return
+        <code>permissionDecision: "deny"</code> — deterministic, code-level enforcement. A prompt
+        instruction like "always verify the customer first" is guidance the model can still get
+        wrong; the hook physically blocks the call regardless of what the model decided.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function buildStepper(stageId, labelId, prevId, nextId, playId, steps){
+  let i = 0, playing = null;
+  const stage = document.getElementById(stageId);
+  const label = document.getElementById(labelId);
+  const prev = document.getElementById(prevId);
+  const next = document.getElementById(nextId);
+  const play = document.getElementById(playId);
+
+  function render(){
+    stage.innerHTML = steps[i].html;
+    label.textContent = `Step ${i+1} / ${steps.length} — ${steps[i].caption}`;
+    prev.disabled = i === 0;
+    next.disabled = i === steps.length - 1;
+    if (i === steps.length - 1 && playing){ clearInterval(playing); playing = null; play.textContent = '▶ Auto-play'; }
+  }
+  prev.onclick = () => { i = Math.max(0, i-1); render(); };
+  next.onclick = () => { i = Math.min(steps.length-1, i+1); render(); };
+  play.onclick = () => {
+    if (playing){ clearInterval(playing); playing = null; play.textContent = '▶ Auto-play'; return; }
+    if (i === steps.length - 1) i = 0;
+    play.textContent = '⏸ Pause';
+    playing = setInterval(() => {
+      if (i >= steps.length - 1){ clearInterval(playing); playing = null; play.textContent = '▶ Auto-play'; return; }
+      i++; render();
+    }, 1600);
+  };
+  render();
+}
+
+// ---------- Panel 1: Agentic loop ----------
+const loopSteps = [
+  { caption: "User sends a request", html: `
+    <div class="node active"><div class="node-title">User &rarr; Claude</div>
+      <div class="node-body">"What's the status of order <code>ORD-4471</code>?"</div></div>` },
+  { caption: "Claude responds with stop_reason = tool_use", html: `
+    <div class="node good"><div class="node-title">Claude response</div>
+      <div class="node-body"><code>stop_reason: "tool_use"</code><br>
+      tool_use block: <code>lookup_order({order_id: "ORD-4471"})</code><br>
+      <code>id: toolu_01Abc</code></div></div>
+    <div class="arrow">↓ loop continues — tool_use means "run and come back"</div>` },
+  { caption: "Your code executes the tool", html: `
+    <div class="node active"><div class="node-title">Your code (not the model)</div>
+      <div class="node-body">Executes <code>lookup_order("ORD-4471")</code> against your real backend<br>
+      &rarr; <code>{status: "shipped", carrier: "UPS", eta: "2026-08-30"}</code></div></div>` },
+  { caption: "Result appended with the matching tool_use_id", html: `
+    <div class="node active"><div class="node-title">You &rarr; Claude</div>
+      <div class="node-body">tool_result block:<br>
+      <code>tool_use_id: toolu_01Abc</code> &larr; must match exactly, or the API rejects it<br>
+      <code>content: "shipped, UPS, ETA 2026-08-30"</code></div></div>
+    <div class="arrow">↓ call again with the full history</div>` },
+  { caption: "Claude responds with stop_reason = end_turn", html: `
+    <div class="node good"><div class="node-title">Claude response</div>
+      <div class="node-body"><code>stop_reason: "end_turn"</code><br>
+      "Your order ORD-4471 has shipped via UPS, ETA Aug 30."</div></div>
+    <div class="arrow">↓ end_turn means "stop" — done.</div>` },
+  { caption: "Two anti-patterns that fail instead", html: `
+    <div class="row">
+      <div class="node bad"><div class="node-title">Anti-pattern</div>
+        <div class="node-body">Parse assistant <b>text</b> for a "done" signal.<br>
+        Fails: the first content block above was a tool_use block with no <code>.text</code> at all.</div></div>
+      <div class="node bad"><div class="node-title">Anti-pattern</div>
+        <div class="node-body">Hardcoded iteration cap as the stop condition.<br>
+        Fails: cap hits while <code>stop_reason</code> is still <code>tool_use</code> — task never finishes.</div></div>
+    </div>` },
+];
+buildStepper('loop-stage','loop-label','loop-prev','loop-next','loop-play', loopSteps);
+
+// ---------- Panel 2: Coordinator / subagents ----------
+const coordSteps = [
+  { caption: "Coordinator receives the task", html: `
+    <div class="node active"><div class="node-title">Coordinator</div>
+      <div class="node-body">"Research how AI code assistants affect developer productivity."<br>
+      <code>allowed_tools</code> includes <code>Agent</code> (exam blueprint calls it <code>Task</code>)</div></div>` },
+  { caption: "Coordinator partitions the topic — not one giant subtask", html: `
+    <div class="node good"><div class="node-title">Coordinator's decomposition</div>
+      <div class="node-body">Splits by <b>angle</b>, not duplicated scope:<br>
+      &bull; subagent A: junior-developer velocity impact<br>
+      &bull; subagent B: senior-developer / code-quality impact<br>
+      Narrow decomposition risk: missing angles no subagent was ever assigned.</div></div>` },
+  { caption: "Both spawned in ONE coordinator turn → run in parallel", html: `
+    <div class="row">
+      <div class="node active"><div class="node-title">Subagent A — isolated context</div>
+        <div class="node-body">Receives <b>only</b> the prompt string handed to it — not the
+        coordinator's history. Tools restricted to <code>Read</code> only.</div></div>
+      <div class="node active"><div class="node-title">Subagent B — isolated context</div>
+        <div class="node-body">Same isolation. Runs concurrently with A because both
+        <code>Agent</code> calls were in the same coordinator response.</div></div>
+    </div>` },
+  { caption: "Each subagent returns a structured, attributable finding", html: `
+    <div class="row">
+      <div class="node good"><div class="node-title">A's finding</div>
+        <div class="node-body">"35% faster time-to-first-PR for juniors" — tagged <code>src-1</code></div></div>
+      <div class="node good"><div class="node-title">B's finding</div>
+        <div class="node-body">"20% report net-negative productivity from review overhead" — tagged <code>src-2</code></div></div>
+    </div>
+    <div class="arrow">↓ content and source metadata travel together, on purpose</div>` },
+  { caption: "Synthesis subagent combines — preserving conflicts, not erasing them", html: `
+    <div class="node active"><div class="node-title">Synthesis subagent</div>
+      <div class="node-body">Produces the final report. Where findings conflict (junior gains vs.
+      senior overhead), <b>both</b> are kept with source attribution — never arbitrarily
+      picked one and discarded the other.</div></div>` },
+];
+buildStepper('coord-stage','coord-label','coord-prev','coord-next','coord-play', coordSteps);
+
+// ---------- Panel 3: Enforcement hook ----------
+const hookSteps = [
+  { caption: "Agent tries to call process_refund early", html: `
+    <div class="node active"><div class="node-title">Claude's tool_use request</div>
+      <div class="node-body"><code>process_refund({customer_id: "CUST-9931", amount_usd: 75})</code><br>
+      — without having called <code>get_customer</code> first in this session.</div></div>` },
+  { caption: "PreToolUse hook fires BEFORE the tool runs", html: `
+    <div class="node active"><div class="node-title">PreToolUse hook</div>
+      <div class="node-body">Checks session state: has <code>get_customer</code> returned a verified
+      <code>customer_id</code> yet? <b>No.</b></div></div>` },
+  { caption: "Hook denies — the tool never executes", html: `
+    <div class="node bad"><div class="node-title">Hook decision</div>
+      <div class="node-body"><code>permissionDecision: "deny"</code><br>
+      <code>permissionDecisionReason: "process_refund requires a verified customer_id first"</code><br>
+      The refund tool <b>never runs</b>. This is enforced in code, not requested in a prompt.</div></div>` },
+  { caption: "Contrast: prompt-only guidance", html: `
+    <div class="node bad"><div class="node-title">What a system-prompt instruction gives you instead</div>
+      <div class="node-body">"Always verify the customer before refunding" — the model <i>usually</i>
+      complies. The exam guide's own sample question cites a real 12% failure rate for exactly
+      this pattern. Non-zero failure + financial consequence = enforce in code, not prose.</div></div>` },
+  { caption: "Correct flow: verify, then refund succeeds", html: `
+    <div class="node good"><div class="node-title">get_customer runs first</div>
+      <div class="node-body">Returns a verified <code>customer_id</code>. PostToolUse hook also
+      normalizes a raw Unix timestamp in the response into ISO 8601 before Claude reasons about it.</div></div>
+    <div class="arrow">↓</div>
+    <div class="node good"><div class="node-title">process_refund now passes the gate</div>
+      <div class="node-body"><code>customer_id</code> matches the verified one, amount is under the
+      $500 policy threshold &rarr; hook returns <code>{}</code> (allow) &rarr; refund executes.</div></div>` },
+];
+buildStepper('hook-stage','hook-label','hook-prev','hook-next','hook-play', hookSteps);
+
+// ---------- Tabs ----------
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

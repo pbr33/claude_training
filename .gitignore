@@ -1,0 +1,4 @@
+_research/
+__pycache__/
+*.pyc
+.env
