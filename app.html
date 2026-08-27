@@ -1006,6 +1006,25 @@ const QUIZ = [
  {tag:'5.1', stem:'Across a long support conversation covering two separate issues, the agent\'s summary of issue #1 (a specific dollar amount and date) gets vaguer by the time it resolves issue #2. What\'s the fix?',
   opts:['Ask the customer to repeat issue #1\'s details when needed','Extract and persist issue #1\'s structured facts (amount, date, order id) into a separate context layer, rather than relying on them surviving in prose history','Shorten the conversation by resolving only one issue at a time','Increase the context window size'],
   correct:1, why:'This is the same persistent-facts pattern as the general context-management principle: pull exact values out into a structured, always-present block rather than trusting they survive summarization or a long history.'},
+
+ {tag:'3.3', stem:'A team has both a directory-level <code>CLAUDE.md</code> in <code>src/payments/</code> and could instead use a <code>.claude/rules/</code> file with <code>paths: ["**/payment-*.ts"]</code> for the same convention. Payment-related files turn out to live in three unrelated top-level directories, not just <code>src/payments/</code>. Which approach actually reaches all of them?',
+  opts:['The directory-level CLAUDE.md, since it\'s simpler','The glob-pattern rule, since it matches by filename pattern regardless of which directory a file lives in','Neither -- combine both into the root CLAUDE.md','Duplicate the directory-level CLAUDE.md into all three directories'],
+  correct:1, why:'A directory-level CLAUDE.md only ever loads for files under that one directory. A glob-pattern rule matches by filename across the whole repo, which is exactly what\'s needed when relevant files aren\'t confined to one subtree.'},
+ {tag:'4.1', stem:'A code-review prompt defines explicit severity levels ("Critical," "Warning," "Minor") but gives no concrete example of what code qualifies for each. Classifications end up inconsistent between similar PRs. Most targeted fix?',
+  opts:['Remove the severity levels entirely and just list issues flatly','Pair each severity level with a concrete code example illustrating it, not just a category name','Ask the model to double-check its own severity ratings before submitting','Reduce the number of severity levels to two'],
+  correct:1, why:'Category names alone leave the boundary between levels to interpretation. Concrete examples per level pin down what actually qualifies, the same way input/output examples pin down an ambiguous transformation.'},
+ {tag:'5.2', stem:'A customer\'s message says: "I already explained this twice, just get me someone who can actually help." No policy gap is present, and the underlying issue is simple. Correct response?',
+  opts:['Keep trying to resolve it, since the issue itself is simple','Honor the explicit request and escalate to a human, without first attempting another round of investigation','Ask the customer to explain a third time so the summary is complete','Offer a partial resolution and see if that satisfies them first'],
+  correct:1, why:'An explicit request for a human is honored immediately, independent of how simple the underlying issue looks -- continuing to investigate against a stated preference is itself the failure mode here.'},
+ {tag:'5.4', stem:'A very long codebase-exploration session has filled its context window with verbose discovery output, and the agent starts giving less reliable answers. What\'s a documented way to reduce context usage mid-session without losing the key findings gathered so far?',
+  opts:['Start an entirely new session and re-explore everything from scratch','Run <code>/compact</code> to reduce context usage, having first persisted key findings to a scratchpad file so nothing important depends on what gets compacted away','Ask the model to simply "be more concise" from now on','Switch to a smaller, faster model mid-session'],
+  correct:1, why:'<code>/compact</code> is the documented in-session mechanism for reducing context usage. Pairing it with a scratchpad file protects the specific findings that matter most from being lost in the compaction.'},
+ {tag:'5.5', stem:'An extraction pipeline\'s confidence scores are trusted at face value, with no check on whether the model is actually well-calibrated. What technique validates whether "90% confidence" really does correspond to about 90% real accuracy?',
+  opts:['Increasing the required confidence threshold to 99%','Stratified random sampling of high-confidence extractions, manually checked against ground truth to measure the real error rate at that confidence level','Asking the model to explain its own confidence score in more detail','Rejecting every extraction below 100% confidence'],
+  correct:1, why:'Stratified sampling -- deliberately checking a representative sample of "high-confidence" results against ground truth -- is what actually validates whether the confidence number means what it claims, and surfaces novel error patterns aggregate metrics would hide.'},
+ {tag:'5.6', stem:'A synthesis step combines findings from three subagents, each of which cited a specific source URL and excerpt for its claims. The final report reads well but no longer mentions where any individual fact came from. What went wrong?',
+  opts:['This is expected -- synthesis is supposed to produce a unified narrative','Source attribution was lost during compression -- the synthesis step needs to preserve claim-source mappings through to the final output, not just the claims themselves','The subagents should have written the final report directly instead of a coordinator','Nothing -- attribution only matters for direct quotes'],
+  correct:1, why:'Claim-source mappings need to survive synthesis, not just exist at the subagent level -- losing them during compression is exactly the provenance failure the guide warns about, even when the prose itself reads perfectly well.'},
 ];
 
 /* =========================================================================
@@ -1172,6 +1191,17 @@ resp = call_claude(messages=msgs, tools=[weather_tool, time_tool], tool_choice={
 resp = call_claude(messages=msgs, tools=[extract_tool, enrich_tool],
                     tool_choice={"type": "tool", "name": "extract_tool"})`;
 
+function errorCategoryRunHTML(){
+  return liveRunHTML({
+    title: 'A generic error string vs. structured error metadata — live.',
+    body: 'The same underlying failure (a policy violation, not retryable) reported two ways. Watch how differently the agent reacts to each.',
+    controlsHTML:
+      '<button class="run" id="err-generic">&#9654; Generic string</button>'+
+      '<button class="run" id="err-structured">&#9654; Structured metadata</button>',
+    consoleId: 'errorcat-console',
+  });
+}
+
 function toolChoiceRunHTML(){
   return liveRunHTML({
     title: 'The same greeting-only message, three tool_choice modes — live.',
@@ -1271,16 +1301,34 @@ const CODE_STRUCTURED = `extract_invoice_tool = {
             "vendor": {"type": "string"},
             "total_usd": {"type": "number"},
             "due_date": {"type": ["string", "null"], "description": "ISO date, or null if not stated"},
+            # enum + "other" pattern -- covers known categories without forcing a
+            # bad fit when the document doesn't match any of them
+            "category": {"type": "string", "enum": ["utilities", "supplies", "services", "other"]},
+            "category_detail": {"type": ["string", "null"],
+                "description": "Free-text detail, required when category is \\"other\\""},
             "line_items": {"type": "array", "items": {"type": "object",
                 "properties": {"desc": {"type": "string"}, "amount_usd": {"type": "number"}}}},
         },
-        "required": ["vendor", "total_usd", "line_items"],  # due_date NOT required -- nullable, prevents fabrication
+        "required": ["vendor", "total_usd", "category", "line_items"],  # due_date NOT required -- nullable, prevents fabrication
     },
 }
 
 resp = call_claude(messages=[...], tools=[extract_invoice_tool],
                     tool_choice={"type": "tool", "name": "extract_invoice"})
-extracted = resp.content[0].input  # guaranteed schema-valid JSON -- but check calculated_total vs stated_total`;
+extracted = resp.content[0].input  # guaranteed schema-valid JSON -- but check calculated_total vs stated_total
+
+# --- validation-retry loop ---
+def extract_with_retry(document, max_attempts=2):
+    result = extract(document)
+    for attempt in range(max_attempts):
+        errors = validate_semantics(result)  # e.g. line items don't sum to total
+        if not errors:
+            return result
+        # detected_pattern tags WHY it failed, so dismissal patterns can be
+        # analyzed in aggregate across many extractions over time
+        log_finding(detected_pattern=errors[0].kind, document_id=document.id)
+        result = extract(document, prior_attempt=result, validation_errors=errors)
+    return result  # if still invalid, route to human review rather than retry forever`;
 
 function structuredRunHTML(){
   return liveRunHTML({
@@ -1288,6 +1336,15 @@ function structuredRunHTML(){
     body: 'Extracts structured fields from an invoice description with a missing due date, proving the nullable field returns null instead of a fabricated date.',
     controlsHTML: '<button class="run" id="structured-run">&#9654; Run live</button>',
     consoleId: 'structured-console',
+  });
+}
+
+function retryRunHTML(){
+  return liveRunHTML({
+    title: 'A deliberately wrong extraction, then a targeted retry — live.',
+    body: 'First extraction is nudged toward a line-item total that does not actually sum correctly. The retry gets the SPECIFIC mismatch as feedback (not a generic "invalid" message) and self-corrects.',
+    controlsHTML: '<button class="run" id="retry-run">&#9654; Run live</button>',
+    consoleId: 'retry-console',
   });
 }
 
@@ -1631,7 +1688,8 @@ function renderT22(){
   '<li>Distinguish access failures (retry-worthy) from valid empty results (successful query, no matches)</li>'+
   '<li>Force a specific tool with <code>tool_choice</code> to guarantee a step runs before others</li>'+
   '<li>Scope each agent to the 4–5 tools its role actually needs</li></ul></div>'+
-  '<h3>Run it for real</h3>'+toolChoiceRunHTML()+
+  '<h3>Run it for real — structured errors</h3>'+errorCategoryRunHTML()+
+  '<h3>Run it for real — tool_choice modes</h3>'+toolChoiceRunHTML()+
   '<h3>The code</h3><div class="card">'+codePanelHTML('tool-choice', CODE_TOOLCHOICE, null, false)+'</div>'+
   quizMini('2.2')+quizMini('2.3');
 }
@@ -1662,6 +1720,14 @@ function renderT24(){
   '<div class="note-inline"><b>Exam trap:</b> preferring a custom-built MCP server over an existing community one '+
   '(e.g. for Jira, GitHub) for a standard integration is over-engineering — reserve custom servers for genuinely '+
   'team-specific workflows.</div>'+
+  '<h3>Picking the right built-in tool</h3>'+
+  '<div class="card"><table class="decision-table"><tr><th>Need</th><th>Tool</th><th>Why</th></tr>'+
+  '<tr><td>Find every call site of a function name</td><td><code>Grep</code></td><td>Searches file <i>contents</i></td></tr>'+
+  '<tr><td>Find all files matching <code>**/*.test.tsx</code></td><td><code>Glob</code></td><td>Matches file <i>paths/names</i>, not contents</td></tr>'+
+  '<tr><td>Change one line, anchor text is unique</td><td><code>Edit</code></td><td>Targeted, minimal diff</td></tr>'+
+  '<tr><td>Edit fails: anchor text isn\'t unique</td><td><code>Read</code> then <code>Write</code></td><td>Fallback — load full contents, write the whole file back</td></tr>'+
+  '<tr><td>Understand an unfamiliar codebase</td><td><code>Grep</code> for entry points, then <code>Read</code> to follow imports</td><td>Incremental — cheaper than reading every file upfront</td></tr>'+
+  '</table></div>'+
   quizMini('2.4')+quizMini('2.5');
 }
 
@@ -1769,8 +1835,11 @@ function renderT43(){
   '<li>Tool use with a JSON schema is the most reliable way to get guaranteed schema-compliant output</li>'+
   '<li>It does not catch semantic errors: line items that don\'t sum to the total, values in the wrong field</li>'+
   '<li>Nullable fields prevent the model from fabricating a value just to satisfy a required field</li>'+
-  '<li>Retry-with-error-feedback works for format/structural mismatches; it does not work when the needed information simply isn\'t in the source</li></ul></div>'+
+  '<li>For extensible categories, pair an enum with an <code>"other"</code> value plus a free-text detail field, rather than forcing every case into a fixed list</li>'+
+  '<li>Retry-with-error-feedback works for format/structural mismatches; it does not work when the needed information simply isn\'t in the source</li>'+
+  '<li>Tagging each finding with a <code>detected_pattern</code> field (what triggered it) enables systematic analysis of which patterns get dismissed most often, across many extractions over time</li></ul></div>'+
   '<h3>Run it for real</h3>'+structuredRunHTML()+
+  '<h3>Run it for real — validation retry</h3>'+retryRunHTML()+
   '<h3>The code</h3><div class="card">'+codePanelHTML('structured-output', CODE_STRUCTURED, null, false)+'</div>'+
   quizMini('4.3')+quizMini('4.4');
 }
@@ -1850,10 +1919,12 @@ function renderT53(){
   '<li>Structured error context (failure type, what was attempted, partial results) enables real coordinator recovery decisions</li>'+
   '<li>Access failures (needing a retry decision) are different from valid empty results (a successful query, no matches) — conflating them is a real anti-pattern</li>'+
   '<li>Silently suppressing an error (empty result marked success) and aborting the whole workflow on one failure are both anti-patterns</li>'+
-  '<li>Scratchpad files persist key findings across context boundaries during long exploration; structured state manifests enable crash recovery</li></ul></div>'+
+  '<li>Scratchpad files persist key findings across context boundaries during long exploration; delegating verbose discovery to subagents keeps it out of the main conversation entirely</li>'+
+  '<li>Structured state manifests enable crash recovery; <code>/compact</code> reduces context usage mid-session when it fills with verbose discovery output</li></ul></div>'+
   '<div class="note-inline"><b>Exam trap:</b> a coordinator that terminates an entire multi-agent workflow because '+
   'one subagent failed is treated the same as silently suppressing the error — both throw away recoverable work. '+
   'The correct pattern is local recovery where possible, structured propagation of what can\'t be resolved locally.</div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('err')+
   quizMini('5.3')+quizMini('5.4');
 }
 
@@ -1887,26 +1958,31 @@ function renderMockExam(){
   return renderMockExamIntro();
 }
 
+const DOMAIN_TARGET_COUNTS = {1: 16, 2: 11, 3: 12, 4: 12, 5: 9};  // matches the real 27/18/20/20/15% blueprint out of 60
+const DOMAIN_NAMES = {1: 'Agentic Architecture & Orchestration', 2: 'Tool Design & MCP Integration',
+  3: 'Claude Code Configuration & Workflows', 4: 'Prompt Engineering & Structured Output', 5: 'Context Management & Reliability'};
+const DOMAIN_WEIGHTS = {1: '27%', 2: '18%', 3: '20%', 4: '20%', 5: '15%'};
+
 function renderMockExamIntro(){
+  const examSize = Object.values(DOMAIN_TARGET_COUNTS).reduce((a, b) => a + b, 0);
+  const rows = Object.keys(DOMAIN_TARGET_COUNTS).map(d =>
+    '<tr><td>'+d+' — '+DOMAIN_NAMES[d]+'</td><td>'+DOMAIN_TARGET_COUNTS[d]+'</td><td>'+DOMAIN_WEIGHTS[d]+'</td></tr>').join('');
   return '<h2>Mock Exam</h2>'+
-  '<p class="dek">All '+QUIZ.length+' questions, one attempt, a real 120-minute countdown, and no answer '+
-  'revealed until you submit — the closest thing here to actual exam conditions. Scored on the real scale: '+
-  '100–1000, 720 to pass.</p>'+
+  '<p class="dek">'+examSize+' questions drawn from a bank of '+QUIZ.length+', one attempt, a real 120-minute '+
+  'countdown, and no answer revealed until you submit — the closest thing here to actual exam conditions. '+
+  'Scored on the real scale: 100–1000, 720 to pass.</p>'+
   '<div class="card"><h3 style="margin-top:0">Exactly how the real exam is weighted</h3>'+
   '<table class="decision-table"><tr><th>Domain</th><th>Questions</th><th>Weight</th></tr>'+
-  '<tr><td>1 — Agentic Architecture &amp; Orchestration</td><td>16</td><td>27%</td></tr>'+
-  '<tr><td>2 — Tool Design &amp; MCP Integration</td><td>11</td><td>18%</td></tr>'+
-  '<tr><td>3 — Claude Code Configuration &amp; Workflows</td><td>12</td><td>20%</td></tr>'+
-  '<tr><td>4 — Prompt Engineering &amp; Structured Output</td><td>12</td><td>20%</td></tr>'+
-  '<tr><td>5 — Context Management &amp; Reliability</td><td>9</td><td>15%</td></tr>'+
-  '<tr><td><b>Total</b></td><td><b>60</b></td><td><b>100%</b></td></tr></table></div>'+
+  rows+
+  '<tr><td><b>Total</b></td><td><b>'+examSize+'</b></td><td><b>100%</b></td></tr></table></div>'+
   '<div class="note-inline"><b>Scoring note:</b> the real exam\'s 100–1000 scale is produced by an undisclosed '+
-  'psychometric model. This uses a straightforward linear approximation (100 + correct/60 × 900) so you get a '+
-  'directionally honest sense of where you stand — treat the pass/fail line as a strong signal, not an exact '+
-  'prediction of your real scaled score.</div>'+
+  'psychometric model. This uses a straightforward linear approximation (100 + correct/'+examSize+' × 900) so you '+
+  'get a directionally honest sense of where you stand — treat the pass/fail line as a strong signal, not an '+
+  'exact prediction of your real scaled score.</div>'+
   '<div class="card" style="text-align:center;padding:32px;">'+
   '<button class="run" style="font-size:13px;padding:14px 28px;" onclick="startMockExam()">&#9654; Start the 120-minute mock exam</button>'+
-  '<p style="font-size:12px;color:var(--ink-soft);margin-top:12px;">Once started, the timer runs even if you navigate away from this page.</p>'+
+  '<p style="font-size:12px;color:var(--ink-soft);margin-top:12px;">Questions are drawn fresh and shuffled each '+
+  'attempt. Once started, the timer runs even if you navigate away from this page.</p>'+
   '</div>';
 }
 
@@ -1982,8 +2058,22 @@ function shuffleArray(arr){
   return a;
 }
 
+function drawWeightedExam(){
+  const byDomain = {};
+  QUIZ.forEach(q => {
+    const d = q.tag.split('.')[0];
+    (byDomain[d] = byDomain[d] || []).push(q);
+  });
+  let drawn = [];
+  Object.keys(DOMAIN_TARGET_COUNTS).forEach(d => {
+    const pool = shuffleArray(byDomain[d] || []);
+    drawn = drawn.concat(pool.slice(0, DOMAIN_TARGET_COUNTS[d]));
+  });
+  return shuffleArray(drawn);
+}
+
 function startMockExam(){
-  mockExam.questions = shuffleArray(QUIZ);
+  mockExam.questions = drawWeightedExam();
   mockExam.answers = {};
   mockExam.phase = 'active';
   mockExam.timeLeft = 120 * 60;
@@ -2166,6 +2256,14 @@ const STEPS_CTX = [
  {caption:'The fix: a persistent case-facts block', html:'<div class="node good"><div class="node-title">Case facts, re-included every turn</div><div class="node-body"><code>{order_id, amount, promised_date}</code> — placed outside the summarized history, at the top of every prompt, so it never has a chance to get lost.</div></div>'},
 ];
 
+const STEPS_ERR = [
+ {caption:'A subagent\'s tool call times out', html:'<div class="node bad"><div class="node-title">Subagent: web-search</div><div class="node-body">The search API times out mid-query. The subagent has to report this back to the coordinator somehow.</div></div>'},
+ {caption:'Anti-pattern: silently suppress it', html:'<div class="node bad"><div class="node-title">Returns <code>{results: []}</code>, marked success</div><div class="node-body">Looks identical to a real "no matches found." The coordinator has no way to tell a failure from a genuinely empty result.</div></div>'},
+ {caption:'Anti-pattern: abort the whole workflow', html:'<div class="node bad"><div class="node-title">Coordinator terminates the entire pipeline</div><div class="node-body">One subagent\'s recoverable timeout throws away every other subagent\'s completed, usable work.</div></div>'},
+ {caption:'Correct: structured error context', html:'<div class="node good"><div class="node-title">Returns failure type + what was attempted + partial results</div><div class="node-body"><code>{failureType: "timeout", attempted: "site:reuters.com XR market 2023", partialResults: [...]}</code></div></div>'},
+ {caption:'Coordinator makes an informed recovery decision', html:'<div class="node good"><div class="node-title">Coordinator</div><div class="node-body">Proceeds with partial results, retries with a narrower query, or annotates the final report with an explicit coverage gap — a decision it could only make because it actually knows what happened.</div></div>'},
+];
+
 function attachSteppers(id){
   if (id === 't11') buildStepper('loop', STEPS_LOOP);
   if (id === 't12') buildStepper('coord', STEPS_COORD);
@@ -2173,6 +2271,7 @@ function attachSteppers(id){
   if (id === 't16') buildStepper('decomp', STEPS_DECOMP);
   if (id === 't17') buildStepper('sess', STEPS_SESS);
   if (id === 't51') buildStepper('ctx', STEPS_CTX);
+  if (id === 't53') buildStepper('err', STEPS_ERR);
 }
 
 /* =========================================================================
@@ -2419,6 +2518,32 @@ async function runToolDescLive(out){
 const WEATHER_TOOL_JS = {name: 'get_weather', description: 'Get the current weather for a city.',
   input_schema: {type: 'object', properties: {city: {type: 'string'}}, required: ['city']}};
 
+const REFUND_TOOL_ERR_JS = {name: 'process_refund', description: 'Refund an order.',
+  input_schema: {type: 'object', properties: {order_id: {type: 'string'}, amount_usd: {type: 'number'}}, required: ['order_id', 'amount_usd']}};
+
+async function runErrorCategoryLive(structured, out){
+  out.clear();
+  const msg = 'Please refund order ORD-8842 for $40. If the refund tool fails, explain what you did next and why.';
+  out.log('> ' + msg, 'meta');
+  const errorBody = structured
+    ? {errorCategory: 'business', isRetryable: false, message: 'This order is outside the 30-day refund window.'}
+    : {error: 'Operation failed'};
+  out.log('(the tool call below is simulated to fail on purpose, so you can see how the agent reacts to each error shape)', 'meta');
+  try {
+    let messages = [{role: 'user', content: msg}];
+    const resp1 = await callClaude({messages, tools: [REFUND_TOOL_ERR_JS], tool_choice: {type: 'any'}});
+    messages.push({role: 'assistant', content: resp1.content});
+    const toolUse = resp1.content.find(b => b.type === 'tool_use');
+    if (!toolUse){ out.log('(model did not call the tool this turn -- try again)'); return; }
+    out.log('tool_use process_refund(' + JSON.stringify(toolUse.input) + ') -- now failing it with: ' + JSON.stringify(errorBody), 'meta');
+    messages.push({role: 'user', content: [{type: 'tool_result', tool_use_id: toolUse.id, content: JSON.stringify(errorBody), is_error: true}]});
+    const resp2 = await callClaude({messages});
+    const text = resp2.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    out.log('');
+    out.log(text, structured ? 'ok' : 'meta');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
 async function runToolChoiceLive(mode, out){
   out.clear();
   const msg = 'Hello! Just wanted to say hi, nothing else.';
@@ -2500,6 +2625,33 @@ async function runStructuredLive(out){
     out.log('');
     if (toolUse.input.due_date === null) out.log('✔ due_date correctly returned null — not fabricated', 'ok');
     else out.log('✗ due_date was fabricated: ' + toolUse.input.due_date, 'err');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+const RETRY_DOC_JS = 'Invoice: 3x Widget @ $12.50 = $37.50, 2x Gadget @ $8.00 = $16.00, Shipping $5.00. Total due: $58.50.';
+
+async function runRetryLive(out){
+  out.clear();
+  out.log('--- Attempt 1 (a realistic flawed first pass) ---', 'meta');
+  const attempt1 = {vendor: 'Acme', total_usd: 58.50, line_items: [
+    {desc: 'Widget x3', amount_usd: 37.50}, {desc: 'Gadget x2', amount_usd: 16.00}, {desc: 'Shipping', amount_usd: 4.00}]};
+  out.log(JSON.stringify(attempt1, null, 2));
+  const sum1 = attempt1.line_items.reduce((s, i) => s + i.amount_usd, 0);
+  out.log('validation: line items sum to $' + sum1.toFixed(2) + ', but total_usd is $' + attempt1.total_usd.toFixed(2) + ' — MISMATCH', 'err');
+  out.log('');
+  out.log('--- Attempt 2: retry with the SPECIFIC mismatch as feedback (live) ---', 'meta');
+  try {
+    const retryPrompt = 'Your previous extraction had line items summing to $' + sum1.toFixed(2) +
+      ' but total_usd was $' + attempt1.total_usd.toFixed(2) + '. Re-extract this invoice, making sure the ' +
+      'line items actually sum to the total:\n\n' + RETRY_DOC_JS + '\n\nYour previous (incorrect) attempt: ' + JSON.stringify(attempt1);
+    const resp = await callClaude({messages: [{role: 'user', content: retryPrompt}],
+      tools: [INVOICE_TOOL_JS], tool_choice: {type: 'tool', name: 'extract_invoice'}});
+    const toolUse = resp.content.find(b => b.type === 'tool_use');
+    out.log(JSON.stringify(toolUse.input, null, 2));
+    const sum2 = toolUse.input.line_items.reduce((s, i) => s + i.amount_usd, 0);
+    const fixed = Math.abs(sum2 - toolUse.input.total_usd) < 0.01;
+    out.log('');
+    out.log(fixed ? '✔ corrected — line items now sum to the stated total' : '✗ still mismatched', fixed ? 'ok' : 'err');
   } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
 }
 
@@ -2607,6 +2759,9 @@ function attachLiveRunners(id){
     document.getElementById('tc-auto').onclick = runBtnGuard('tc-auto', () => runToolChoiceLive('auto', out()));
     document.getElementById('tc-any').onclick = runBtnGuard('tc-any', () => runToolChoiceLive('any', out()));
     document.getElementById('tc-forced').onclick = runBtnGuard('tc-forced', () => runToolChoiceLive('forced', out()));
+    const errOut = () => liveConsole('errorcat-console');
+    document.getElementById('err-generic').onclick = runBtnGuard('err-generic', () => runErrorCategoryLive(false, errOut()));
+    document.getElementById('err-structured').onclick = runBtnGuard('err-structured', () => runErrorCategoryLive(true, errOut()));
   }
   if (id === 't35'){
     document.getElementById('refine-run').onclick = runBtnGuard('refine-run', () => runRefinementLive(liveConsole('refine-console')));
@@ -2616,6 +2771,7 @@ function attachLiveRunners(id){
   }
   if (id === 't43'){
     document.getElementById('structured-run').onclick = runBtnGuard('structured-run', () => runStructuredLive(liveConsole('structured-console')));
+    document.getElementById('retry-run').onclick = runBtnGuard('retry-run', () => runRetryLive(liveConsole('retry-console')));
   }
   if (id === 't46'){
     document.getElementById('review-run').onclick = runBtnGuard('review-run', () => runReviewLive(liveConsole('review-console')));
