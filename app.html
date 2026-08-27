@@ -1025,6 +1025,22 @@ const QUIZ = [
  {tag:'5.6', stem:'A synthesis step combines findings from three subagents, each of which cited a specific source URL and excerpt for its claims. The final report reads well but no longer mentions where any individual fact came from. What went wrong?',
   opts:['This is expected -- synthesis is supposed to produce a unified narrative','Source attribution was lost during compression -- the synthesis step needs to preserve claim-source mappings through to the final output, not just the claims themselves','The subagents should have written the final report directly instead of a coordinator','Nothing -- attribution only matters for direct quotes'],
   correct:1, why:'Claim-source mappings need to survive synthesis, not just exist at the subagent level -- losing them during compression is exactly the provenance failure the guide warns about, even when the prose itself reads perfectly well.'},
+
+ {tag:'2.3', stem:'A synthesis subagent, whose role is combining already-gathered findings, starts attempting its own web searches when it feels a source is thin -- even though a dedicated research subagent exists for that. What\'s the underlying problem, and the fix?',
+  opts:['The synthesis subagent is broken and needs to be replaced','It has a tool outside its specialization available to it; scope it to only what synthesis actually requires, and route search needs back through the coordinator (or give it one narrow, high-frequency cross-role tool if this comes up constantly)','This is fine -- more initiative is always better','The research subagent should be removed entirely'],
+  correct:1, why:'Agents given tools outside their specialization tend to misuse them. The fix is scoping tool access to the role, not hoping the model self-restrains -- with a narrow, deliberate exception for genuinely high-frequency shared needs.'},
+ {tag:'2.4', stem:'A team adds a second MCP server to their project mid-sprint. Do they need to restart or reconfigure anything for the first server\'s tools to keep working alongside the new one?',
+  opts:['Yes -- only one MCP server\'s tools are available at a time, so they must choose','No -- tools from every configured MCP server are discovered at connection time and available simultaneously','Yes -- the servers need to be merged into a single config file first','No, but only if both servers are community-maintained'],
+  correct:1, why:'All configured MCP servers\' tools are discovered together and available at once -- there\'s no "one active server" limitation to work around.'},
+ {tag:'2.5', stem:'A function is called directly in some files but reached through two different re-exported wrapper names in others, and a Grep for the original name misses those. Best approach to find every real usage?',
+  opts:['Grep for the original function name only -- wrappers don\'t count as real usage','First identify every exported alias/wrapper name for the function, then Grep for each one separately','Read every file in the repo to be safe','Rename the function so it only has one name'],
+  correct:1, why:'Tracing usage across wrapper modules means first finding all the names the function is actually reachable under, then searching for each -- a single Grep on the original name silently misses anything routed through a re-export.'},
+ {tag:'3.5', stem:'Before implementing a caching layer in an area of the codebase Claude hasn\'t worked in before, the developer asks it to first ask clarifying questions about invalidation strategy and failure modes, rather than just starting to write code. What\'s this pattern, and why use it here specifically?',
+  opts:['The "interview pattern" -- useful for surfacing design considerations before implementing in an unfamiliar domain, where the risk of missing a real constraint is highest','Unnecessary politeness that just slows things down','Only useful for junior developers, not for working with Claude','The same as test-driven iteration'],
+  correct:0, why:'The interview pattern earns its cost specifically in unfamiliar-domain, high-stakes situations -- cache invalidation is a classic example where an overlooked failure mode is expensive to discover after the fact rather than before writing any code.'},
+ {tag:'3.6', stem:'A team\'s CI-invoked Claude Code review job keeps missing the project\'s specific test-fixture conventions, even though local interactive sessions always follow them correctly. Most likely cause and fix?',
+  opts:['CI sessions are just less capable -- nothing to be done','The CI job has no prior conversation to draw context from, and the project\'s CLAUDE.md (which supplies that context locally) either isn\'t being read or doesn\'t document the fixture conventions -- fix is ensuring CLAUDE.md covers them explicitly','Switch to a different CI provider','Increase max_tokens for the CI run'],
+  correct:1, why:'CLAUDE.md is exactly how CI-invoked Claude Code is meant to receive project context it has no other way to pick up -- a local session might absorb conventions from earlier conversation, but a fresh CI job has nothing but what CLAUDE.md documents.'},
 ];
 
 /* =========================================================================
@@ -1682,7 +1698,8 @@ function renderT22(){
   '<li>The MCP <code>isError</code> flag pattern for signaling tool failure back to the agent</li>'+
   '<li>Transient (timeout) vs. validation (bad input) vs. business (policy) vs. permission errors — each needs a different reaction</li>'+
   '<li><code>tool_choice</code>: <code>"auto"</code> (may skip), <code>"any"</code> (must call some tool), <code>{"type":"tool","name":"..."}</code> (must call that one)</li>'+
-  '<li>Too many tools (18 instead of 4–5) degrades selection reliability by increasing decision complexity</li></ul>'+
+  '<li>Too many tools (18 instead of 4–5) degrades selection reliability by increasing decision complexity</li>'+
+  '<li>Agents given tools outside their specialization tend to misuse them (a synthesis agent attempting its own web searches instead of asking the coordinator) — scope each agent to its role, with a few narrow cross-role tools for genuinely high-frequency shared needs</li></ul>'+
   '<div class="kslabel">Skills</div><ul>'+
   '<li>Return <code>errorCategory</code>, <code>isRetryable</code>, and a human-readable description — not a generic string</li>'+
   '<li>Distinguish access failures (retry-worthy) from valid empty results (successful query, no matches)</li>'+
@@ -1703,7 +1720,10 @@ function renderT24(){
   '<li>Project-scope MCP servers live in <code>.mcp.json</code> (shared, checked into the repo); personal/experimental ones go in <code>~/.claude.json</code></li>'+
   '<li>Environment variable expansion (e.g. <code>${GITHUB_TOKEN}</code>) keeps credentials out of the committed config</li>'+
   '<li>MCP <b>resources</b> expose content catalogs (docs, schemas) to cut down on exploratory tool calls; MCP <b>tools</b> are for actions</li>'+
-  '<li><code>Grep</code> = content search, <code>Glob</code> = filename pattern search, <code>Edit</code> needs unique anchor text (fall back to Read+Write when it isn\'t unique)</li></ul></div>'+
+  '<li>Tools from <b>every</b> configured MCP server are discovered at connection time and available simultaneously — not one server at a time</li>'+
+  '<li>A vague MCP tool description can lose out to a built-in tool the model already trusts (e.g. it reaches for <code>Grep</code> instead of a more capable MCP search tool) — the fix is a richer description, the same lesson as Task 2.1</li>'+
+  '<li><code>Grep</code> = content search, <code>Glob</code> = filename pattern search, <code>Edit</code> needs unique anchor text (fall back to Read+Write when it isn\'t unique)</li>'+
+  '<li>Trace a function used under several re-exported/wrapper names by first listing all its exported aliases, then searching for each one separately</li></ul></div>'+
   '<h3>Try it yourself</h3>'+cliCardHTML({
     title: 'A project-scoped .mcp.json with credential expansion',
     body: 'Checked into the repo so the whole team gets the same MCP servers — the token itself never is.',
@@ -1733,6 +1753,49 @@ function renderT24(){
 
 /* ===================== DOMAIN 3 — Claude Code Configuration & Workflows ===================== */
 
+const CODE_CLAUDE_HIERARCHY = `# CLAUDE.md (project root -- committed, shared with the whole team)
+- Use TypeScript strict mode everywhere.
+- Run \`npm test\` before considering any change done.
+
+# src/payments/CLAUDE.md (directory-level -- committed, but only loads
+# once Claude actually reads/edits a file under src/payments/)
+- Never log a full card number, even in debug output.
+
+# ~/.claude/CLAUDE.md (user scope -- lives outside the repo entirely,
+# never reaches a teammate no matter how long it's been there)
+- I prefer functional components over class components.
+
+# ---- @import: organizes, does NOT reduce what loads ----
+# CLAUDE.md
+@STYLE_GUIDE.md
+- Run \`npm test\` before considering any change done.
+# STYLE_GUIDE.md's full content still loads at session start, same as if
+# it had been pasted directly into CLAUDE.md.
+
+# ---- .claude/rules/testing.md -- THIS is what actually loads conditionally ----
+---
+paths: ["**/*.test.ts"]
+---
+# Testing conventions
+- Every test file starts with a comment naming the function under test.
+# A session that never touches a *.test.ts file never pays for this at all.
+
+# ---- .claude/commands/review.md (shared -- committed, everyone gets /review) ----
+Review the current diff for bugs, security issues, and style-guide violations.
+
+# ---- ~/.claude/commands/todo.md (personal -- only you have /todo) ----
+Scan the current diff for any new TODO comments and list them with file:line.
+
+# ---- .claude/skills/audit-dependencies/SKILL.md ----
+---
+description: Audit dependencies for known vulnerabilities and outdated majors
+context: fork          # runs in its own isolated sub-conversation --
+                        # the main session gets a summary, not raw npm-audit noise
+allowed-tools: Read, Bash   # cannot Edit anything, even if the main session can
+argument-hint: [package-name]
+---
+Run \`npm audit\` and \`npm outdated\`, report findings grouped by severity.`;
+
 function renderT31(){
   return '<div class="taghead"><span class="pill">Tasks 3.1–3.3</span></div>'+
   '<h2>CLAUDE.md, commands, skills &amp; rules</h2>'+
@@ -1746,7 +1809,9 @@ function renderT31(){
   '<div class="kslabel">Skills</div><ul>'+
   '<li>Diagnose "a new teammate isn\'t getting the instruction" as a user-scope-vs-project-scope bug</li>'+
   '<li>Split a 600-line CLAUDE.md into path-scoped rules so non-matching sessions never load them</li>'+
-  '<li>Use <code>context: fork</code> for a skill that produces verbose exploratory output</li></ul></div>'+
+  '<li>Use <code>context: fork</code> for a skill that produces verbose exploratory output</li>'+
+  '<li>Use a personal skill variant in <code>~/.claude/skills/</code> under a different name when experimenting, so it never affects teammates</li>'+
+  '<li>Use <code>/memory</code> to see which memory files are configured, and <code>/context</code> to see what actually loaded this session — the fast way to debug "why isn\'t Claude following X"</li></ul></div>'+
   '<h3>Try it yourself</h3>'+cliCardHTML({
     title: 'A path-scoped rule that only loads for API files',
     body: 'Lives in .claude/rules/api-conventions.md — Claude Code loads it only when it actually touches a matching file, not at every session start.',
@@ -1758,11 +1823,13 @@ paths: ["src/api/**/*.ts"]
 - Every handler validates its input with zod before touching the DB
 - Return errors as { code, message }, never a bare string`,
   })+
-  '<div class="note-inline"><b>Want the full hands-on version?</b> '+
-  '<code>03-claude-code-config/labs/lab_claude_md_hierarchy.md</code> in the repo walks through building all '+
-  'three CLAUDE.md scopes, an <code>@import</code>, a path-scoped rule, a shared command, a personal command, '+
-  'and a <code>context: fork</code> skill — as real files you create and test with the actual Claude Code CLI, '+
-  'step by step, no API key needed.</div>'+
+  '<h3>The full hands-on lab</h3>'+
+  '<div class="card">'+codePanelHTML('lab_claude_md_hierarchy', CODE_CLAUDE_HIERARCHY, null, false)+'</div>'+
+  '<div class="note-inline">That\'s the key files condensed — the complete step-by-step version, with what to '+
+  'run and what to check after each step, is at '+
+  '<a href="03-claude-code-config/labs/lab_claude_md_hierarchy.md" target="_blank">'+
+  '<code>03-claude-code-config/labs/lab_claude_md_hierarchy.md</code></a> in the repo (opens if you\'re serving '+
+  'this over <code>http://localhost</code> — see the README if it 404s from a plain <code>file://</code> open).</div>'+
   quizMini('3.1')+quizMini('3.2')+quizMini('3.3');
 }
 
@@ -1802,7 +1869,9 @@ function renderT36(){
   '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
   '<li><code>-p</code> / <code>--print</code>: non-interactive mode — the documented way to avoid a hung pipeline. There is no <code>CLAUDE_HEADLESS</code> env var or <code>--batch</code> flag; those are invented-sounding distractors</li>'+
   '<li><code>--output-format json</code> + <code>--json-schema</code>: structured, parseable findings for posting inline PR comments</li>'+
-  '<li>A fresh review instance catches more than the same session reviewing its own generated code</li></ul></div>'+
+  '<li>A fresh review instance catches more than the same session reviewing its own generated code</li>'+
+  '<li>CLAUDE.md is how CI-invoked Claude Code gets project context it has no other way to pick up — testing standards, fixture conventions, review criteria — since a CI job has no prior conversation to draw on</li>'+
+  '<li>Passing existing test files into context for test-generation runs stops it from proposing scenarios the suite already covers</li></ul></div>'+
   '<h3>Try it yourself</h3>'+cliCardHTML({
     title: 'A CI-safe, structured review invocation',
     body: 'The -p flag prevents an interactive-input hang; --output-format json makes the findings parseable by the next pipeline step.',
