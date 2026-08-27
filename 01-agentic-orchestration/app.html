@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domain 1 Study App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EFF1EC; --card:#FBFBF8; --ink:#17233D; --ink-soft:#4A5567; --hair:#D9DBD3;
+    --c1:#2C5A7C; --c1bg:#E4EAF0; --good:#2F6B54; --goodbg:#E3ECE7; --bad:#9A3E2E; --badbg:#F3E1DC;
+    --accent:#9A5B1E; --accentbg:#F3E7D6; --sidebar:#E7E9E3;
+    --kw:#7A3B8A; --str:#2F6B54; --cmt:#8B93A3; --dec:#9A5B1E; --num:#2C5A7C;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#12161D; --card:#191F29; --ink:#E9ECF2; --ink-soft:#A7B0C0; --hair:#2B3140;
+      --c1:#7FB0DA; --c1bg:#1E2C3A; --good:#7FCBA6; --goodbg:#1B2E27; --bad:#E39685; --badbg:#33221D;
+      --accent:#D9A05B; --accentbg:#2E2419; --sidebar:#161B23;
+      --kw:#C99BDA; --str:#8FCBA9; --cmt:#7A8397; --dec:#D9A05B; --num:#7FB0DA;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#12161D; --card:#191F29; --ink:#E9ECF2; --ink-soft:#A7B0C0; --hair:#2B3140;
+    --c1:#7FB0DA; --c1bg:#1E2C3A; --good:#7FCBA6; --goodbg:#1B2E27; --bad:#E39685; --badbg:#33221D;
+    --accent:#D9A05B; --accentbg:#2E2419; --sidebar:#161B23;
+    --kw:#C99BDA; --str:#8FCBA9; --cmt:#7A8397; --dec:#D9A05B; --num:#7FB0DA;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;}
+  a{color:var(--c1);}
+  code,.mono{font-family:'IBM Plex Mono',monospace;}
+  .app{display:grid;grid-template-columns:264px 1fr;min-height:100vh;}
+  @media (max-width:860px){.app{grid-template-columns:1fr;} .sidebar{position:static;height:auto;}}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{background:var(--sidebar);border-right:1px solid var(--hair);padding:20px 14px;
+           position:sticky;top:0;height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:16px;}
+  .brand{padding:4px 8px 10px;}
+  .brand .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;
+                  text-transform:uppercase;color:var(--ink-soft);}
+  .brand h1{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:19px;letter-spacing:-.01em;
+            margin:4px 0 2px;line-height:1.15;}
+  .brand .weight{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent);}
+  .navgroup-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;
+                  text-transform:uppercase;color:var(--ink-soft);padding:0 8px;margin-top:4px;}
+  nav{display:flex;flex-direction:column;gap:2px;}
+  .navitem{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;
+           font-size:13px;color:var(--ink-soft);border:1px solid transparent;}
+  .navitem:hover{background:var(--card);}
+  .navitem.active{background:var(--c1bg);color:var(--c1);font-weight:600;border-color:var(--c1);}
+  .navitem .dot{width:7px;height:7px;border-radius:50%;background:var(--hair);flex-shrink:0;}
+  .navitem.done .dot{background:var(--good);}
+  .navitem .n{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);width:26px;flex-shrink:0;}
+  .progress-card{margin-top:auto;background:var(--card);border:1px solid var(--hair);border-radius:10px;
+                 padding:12px 14px;}
+  .progress-card .label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;
+                        text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;}
+  .bar{height:6px;border-radius:4px;background:var(--hair);overflow:hidden;}
+  .bar > div{height:100%;background:var(--good);transition:width .3s;}
+  .progress-card .count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:6px;}
+
+  /* ---------- Main ---------- */
+  main{padding:36px 40px 80px;max-width:900px;}
+  @media (max-width:860px){main{padding:24px 18px 60px;}}
+  .section{display:none;}
+  .section.active{display:block;}
+  .taghead{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;}
+  .pill{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.03em;
+        padding:3px 9px;border-radius:20px;background:var(--c1bg);color:var(--c1);}
+  h2{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:30px;letter-spacing:-.015em;
+     margin:2px 0 8px;text-wrap:balance;}
+  .dek{color:var(--ink-soft);font-size:14.5px;line-height:1.6;max-width:640px;margin-bottom:26px;}
+  h3{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:18px;margin:32px 0 12px;}
+  .card{background:var(--card);border:1px solid var(--hair);border-radius:12px;padding:20px 22px;
+        margin-bottom:18px;}
+  .concept ul{margin:0;padding-left:20px;line-height:1.75;font-size:14px;}
+  .concept li b{color:var(--ink);}
+  .concept .kslabel{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;
+                    text-transform:uppercase;color:var(--accent);margin:14px 0 6px;}
+  .concept .kslabel:first-child{margin-top:0;}
+
+  /* stepper (visualizer) */
+  .stage{min-height:220px;display:flex;flex-direction:column;gap:10px;justify-content:center;}
+  .controls{display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;}
+  button{font-family:'IBM Plex Mono',monospace;font-size:11.5px;letter-spacing:.02em;padding:9px 15px;
+         border-radius:7px;border:1px solid var(--hair);background:var(--paper);color:var(--ink);cursor:pointer;}
+  button.primary{background:var(--c1);color:#fff;border-color:var(--c1);}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  .step-label{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);margin-left:auto;}
+  .node{border:1.5px solid var(--hair);border-radius:10px;padding:11px 15px;background:var(--paper);
+        transition:all .25s;opacity:.5;transform:translateY(3px);}
+  .node.active{opacity:1;transform:translateY(0);border-color:var(--c1);background:var(--c1bg);}
+  .node.good{border-color:var(--good);background:var(--goodbg);}
+  .node.bad{border-color:var(--bad);background:var(--badbg);}
+  .node-title{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.03em;
+              text-transform:uppercase;color:var(--ink-soft);margin-bottom:3px;}
+  .node.active .node-title{color:var(--c1);}
+  .node-body{font-size:13px;line-height:1.5;}
+  .row{display:flex;gap:12px;}
+  .row > .node{flex:1;}
+  .arrow{text-align:center;color:var(--ink-soft);font-size:16px;opacity:.5;}
+  code.inline,.node code,.dek code,.concept code{font-family:'IBM Plex Mono',monospace;font-size:.92em;
+        background:rgba(120,120,120,.14);padding:1px 5px;border-radius:4px;}
+
+  /* live API settings */
+  .api-status{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:8px;cursor:pointer;
+              font-size:12px;border:1px solid var(--hair);background:var(--card);}
+  .api-status .led{width:8px;height:8px;border-radius:50%;background:var(--bad);flex-shrink:0;}
+  .api-status.connected .led{background:var(--good);}
+  .api-panel{display:none;background:var(--card);border:1px solid var(--hair);border-radius:10px;
+             padding:14px 16px;margin-top:8px;}
+  .api-panel.open{display:block;}
+  .api-panel label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+                   text-transform:uppercase;color:var(--ink-soft);margin:10px 0 4px;}
+  .api-panel label:first-child{margin-top:0;}
+  .api-panel input[type=password],.api-panel input[type=text]{width:100%;padding:8px 10px;border-radius:7px;
+      border:1px solid var(--hair);background:var(--paper);color:var(--ink);font-family:'IBM Plex Mono',monospace;
+      font-size:12px;}
+  .api-panel .remember{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;color:var(--ink-soft);}
+  .api-panel .remember input{width:auto;}
+  .api-panel .hint{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;}
+  .api-panel .savebtn{margin-top:12px;width:100%;}
+
+  /* live-run blocks */
+  .runbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap;}
+  .runbar input[type=text]{flex:1;min-width:220px;padding:9px 12px;border-radius:7px;border:1px solid var(--hair);
+      background:var(--paper);color:var(--ink);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  button.run{background:var(--good);color:#fff;border-color:var(--good);}
+  button.run:disabled{opacity:.5;}
+  .console{background:#0B0E13;color:#CFE7DC;font-family:'IBM Plex Mono',monospace;font-size:12px;
+           line-height:1.65;padding:14px 16px;border-radius:10px;margin-top:12px;white-space:pre-wrap;
+           min-height:60px;max-height:360px;overflow-y:auto;display:none;}
+  .console.shown{display:block;}
+  .console .ok{color:#8FCBA9;} .console .err{color:#E39685;} .console .meta{color:#6FA8DC;}
+  .livecard{border:1px solid var(--good);border-radius:12px;padding:18px 20px;margin-bottom:18px;
+            background:color-mix(in srgb, var(--good) 6%, var(--card));}
+  .livecard .livehead{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .livecard .livehead .badge{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+      text-transform:uppercase;background:var(--good);color:#fff;padding:2px 8px;border-radius:12px;}
+  .note-inline{background:var(--accentbg);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;
+              padding:10px 14px;font-size:12.5px;line-height:1.55;margin:12px 0;}
+
+  /* code panel */
+  .codebar{display:flex;align-items:center;justify-content:space-between;background:var(--c1);
+           color:#fff;padding:9px 16px;border-radius:10px 10px 0 0;font-family:'IBM Plex Mono',monospace;
+           font-size:11.5px;}
+  .codebar .status{padding:2px 9px;border-radius:14px;font-size:10px;letter-spacing:.03em;}
+  .codebar .status.live{background:var(--good);}
+  .codebar .status.setup{background:var(--accent);}
+  pre.code{margin:0;background:#11151C;color:#D8DEE9;padding:18px 20px;border-radius:0 0 10px 10px;
+           overflow-x:auto;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.65;
+           max-height:480px;overflow-y:auto;}
+  pre.code .kw{color:#C99BDA;} pre.code .str{color:#8FCBA9;} pre.code .cmt{color:#7A8397;font-style:italic;}
+  pre.code .dec{color:#D9A05B;} pre.code .num{color:#7FB0DA;}
+  .output{background:#0B0E13;color:#B9E8CE;font-family:'IBM Plex Mono',monospace;font-size:12px;
+          line-height:1.6;padding:16px 18px;border-radius:10px;margin-top:10px;white-space:pre-wrap;
+          max-height:320px;overflow-y:auto;}
+  .output .tag{color:#6FA8DC;}
+  .setup-note{background:var(--accentbg);border:1px solid var(--accent);border-radius:10px;
+              padding:12px 16px;font-size:12.5px;line-height:1.55;margin-top:10px;color:var(--ink);}
+
+  /* quiz */
+  .qcard{border:1px solid var(--hair);border-radius:10px;padding:16px 18px;margin-bottom:12px;background:var(--card);}
+  .qstem{font-size:14px;line-height:1.55;margin-bottom:10px;}
+  .qtag{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);margin-bottom:8px;display:block;}
+  .opt{display:block;width:100%;text-align:left;padding:9px 12px;border-radius:8px;border:1px solid var(--hair);
+       background:var(--paper);color:var(--ink);font-size:13px;margin-bottom:7px;cursor:pointer;font-family:inherit;}
+  .opt:hover{border-color:var(--c1);}
+  .opt.correct{border-color:var(--good);background:var(--goodbg);}
+  .opt.wrong{border-color:var(--bad);background:var(--badbg);}
+  .opt:disabled{cursor:default;}
+  .explain{display:none;font-size:12.5px;line-height:1.6;color:var(--ink-soft);margin-top:8px;
+           padding-top:8px;border-top:1px solid var(--hair);}
+  .explain.shown{display:block;}
+  .explain b{color:var(--ink);}
+  .quiz-summary{display:flex;align-items:center;gap:16px;padding:18px 22px;border-radius:12px;
+                background:var(--c1bg);border:1px solid var(--c1);margin-bottom:20px;}
+  .quiz-summary .score{font-family:'Fraunces',serif;font-weight:700;font-size:34px;color:var(--c1);}
+  .quiz-summary .detail{font-size:13px;color:var(--ink-soft);line-height:1.5;}
+
+  /* capstone checklist */
+  .steplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .steplist li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.55;
+              padding:10px 12px;border-radius:8px;border:1px solid var(--hair);background:var(--paper);}
+  .steplist input[type=checkbox]{margin-top:3px;flex-shrink:0;width:15px;height:15px;accent-color:var(--good);}
+  .doneline{text-decoration:line-through;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="eyebrow">CCAR-F Study App</div>
+      <h1>Agentic Architecture<br>&amp; Orchestration</h1>
+      <div class="weight">Domain 1 · 27% of the exam</div>
+    </div>
+    <div class="navgroup-label">Task statements</div>
+    <nav id="nav"></nav>
+
+    <div class="navgroup-label">Live API</div>
+    <div class="api-status" id="api-status-btn" onclick="toggleApiPanel()">
+      <span class="led" id="api-led"></span>
+      <span id="api-status-text">Not connected — click to add your key</span>
+    </div>
+    <div class="api-panel" id="api-panel">
+      <label for="api-key">Your API key</label>
+      <input type="password" id="api-key" placeholder="sk-ant-... or your Azure key" autocomplete="off">
+      <label for="api-base">Base URL <span style="text-transform:none;">(optional — blank = api.anthropic.com)</span></label>
+      <input type="text" id="api-base" placeholder="https://your-resource.services.ai.azure.com/anthropic">
+      <label for="api-model">Model</label>
+      <input type="text" id="api-model" placeholder="claude-sonnet-5" value="claude-sonnet-5">
+      <label class="remember"><input type="checkbox" id="api-remember"> Remember for this browser tab only</label>
+      <button class="primary savebtn" onclick="saveApiSettings()">Connect</button>
+      <div class="hint">Sent directly from your browser to the API — never saved to a file, never sent anywhere
+      else. Nothing here gets committed to the repo. Clearing this field or closing the tab (unless you checked
+      "remember") erases it completely.</div>
+    </div>
+
+    <div class="progress-card">
+      <div class="label">Your progress</div>
+      <div class="bar"><div id="progbar" style="width:0%"></div></div>
+      <div class="count" id="progcount">0 / 8 sections · quiz not started</div>
+    </div>
+  </aside>
+
+  <main id="main"></main>
+</div>
+
+<script>
+/* =========================================================================
+   CONTENT DATA
+   ========================================================================= */
+
+const SECTIONS = [
+  {id:'overview', num:'', label:'Overview'},
+  {id:'t11', num:'1.1', label:'Agentic Loop'},
+  {id:'t12', num:'1.2/1.3', label:'Coordinator & Subagents'},
+  {id:'t14', num:'1.4/1.5', label:'Enforcement & Hooks'},
+  {id:'t16', num:'1.6', label:'Decomposition'},
+  {id:'t17', num:'1.7', label:'Sessions & Forking'},
+  {id:'capstones', num:'', label:'Capstones'},
+  {id:'quiz', num:'', label:'Practice Quiz (13)'},
+];
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function pyHighlight(code){
+  const KW = /\b(def|class|import|from|as|return|if|elif|else|for|while|in|is|not|and|or|None|True|False|try|except|raise|with|async|await|pass|continue|break|lambda|yield|global|assert)\b/g;
+  const TOK = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|#[^\n]*|@\w+)/g;
+  let out = '', last = 0, m;
+  const kwWrap = s => s.replace(KW, '<span class="kw">$1</span>');
+  while ((m = TOK.exec(code))) {
+    out += kwWrap(esc(code.slice(last, m.index)));
+    const tok = m[0];
+    let cls = tok.startsWith('#') ? 'cmt' : tok.startsWith('@') ? 'dec' : 'str';
+    out += '<span class="' + cls + '">' + esc(tok) + '</span>';
+    last = TOK.lastIndex;
+  }
+  out += kwWrap(esc(code.slice(last)));
+  return out;
+}
+
+/* =========================================================================
+   LIVE API — every "Run live" button below calls the real Claude API
+   directly from your browser with the key you paste into the panel. It\'s
+   never written to a file, never sent to any server of mine, and (unless
+   you check "remember") disappears the moment you close the tab.
+   ========================================================================= */
+
+const apiState = { apiKey: '', baseUrl: '', model: 'claude-sonnet-5' };
+
+function loadApiState(){
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('ccarf-d1-api') || 'null');
+    if (saved) Object.assign(apiState, saved);
+  } catch(e){}
+  if (apiState.apiKey){
+    document.getElementById('api-key').value = apiState.apiKey;
+    document.getElementById('api-base').value = apiState.baseUrl;
+    document.getElementById('api-model').value = apiState.model;
+    document.getElementById('api-remember').checked = true;
+  }
+  updateApiStatusUI();
+}
+
+function toggleApiPanel(){
+  document.getElementById('api-panel').classList.toggle('open');
+}
+
+function saveApiSettings(){
+  apiState.apiKey = document.getElementById('api-key').value.trim();
+  apiState.baseUrl = document.getElementById('api-base').value.trim();
+  apiState.model = document.getElementById('api-model').value.trim() || 'claude-sonnet-5';
+  if (document.getElementById('api-remember').checked){
+    try { sessionStorage.setItem('ccarf-d1-api', JSON.stringify(apiState)); } catch(e){}
+  } else {
+    try { sessionStorage.removeItem('ccarf-d1-api'); } catch(e){}
+  }
+  updateApiStatusUI();
+  document.getElementById('api-panel').classList.remove('open');
+}
+
+function updateApiStatusUI(){
+  const led = document.getElementById('api-led');
+  const text = document.getElementById('api-status-text');
+  const connected = !!apiState.apiKey;
+  led.parentElement.classList.toggle('connected', connected);
+  text.textContent = connected
+    ? 'Connected · ' + (apiState.baseUrl ? 'custom endpoint' : 'api.anthropic.com') + ' · ' + apiState.model
+    : 'Not connected — click to add your key';
+}
+
+function friendlyError(e){
+  if (e.message === 'NO_KEY') return 'No API key set. Click "Live API" in the sidebar and paste yours in.';
+  if (e.status === 401) return 'Auth failed — the key was rejected. Double-check it in the Live API panel.';
+  if (e.status === 400 && /credit balance/i.test(e.message)) return 'This key has no credit balance. Add credits, then try again.';
+  if (e instanceof TypeError) return 'Network/CORS error reaching the API. If you set a custom base URL, confirm it allows direct browser access.';
+  return e.message || String(e);
+}
+
+async function callClaude({messages, tools, tool_choice, system}){
+  if (!apiState.apiKey) throw new Error('NO_KEY');
+  const base = (apiState.baseUrl || 'https://api.anthropic.com').replace(/\/$/, '');
+  const body = { model: apiState.model || 'claude-sonnet-5', max_tokens: 1024, messages };
+  if (tools) body.tools = tools;
+  if (tool_choice) body.tool_choice = tool_choice;
+  if (system) body.system = system;
+  const resp = await fetch(base + '/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiState.apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok){
+    const err = new Error((data && data.error && data.error.message) || resp.statusText);
+    err.status = resp.status;
+    throw err;
+  }
+  return data;
+}
+
+function liveConsole(id){
+  const el = document.getElementById(id);
+  return {
+    clear(){ el.textContent = ''; el.classList.add('shown'); },
+    log(line, cls){
+      el.classList.add('shown');
+      const span = document.createElement('div');
+      if (cls) span.className = cls;
+      span.textContent = line;
+      el.appendChild(span);
+      el.scrollTop = el.scrollHeight;
+    },
+  };
+}
+
+function runBtnGuard(btnId, fn){
+  return async () => {
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = 'Running…';
+    try { await fn(); }
+    finally { btn.disabled = false; btn.textContent = original; }
+  };
+}
+
+/* ---------- Lab source (verbatim from labs/) ---------- */
+
+const CODE_LAB1 = `from types import SimpleNamespace
+
+from common import MODEL, call_claude, get_client
+
+ORDERS = {
+    "ORD-4471": {"status": "shipped", "carrier": "UPS", "eta": "2026-08-30"},
+}
+
+LOOKUP_ORDER_TOOL = {
+    "name": "lookup_order",
+    "description": "Look up the shipping status of an order by its order ID.",
+    "input_schema": {
+        "type": "object",
+        "properties": {"order_id": {"type": "string"}},
+        "required": ["order_id"],
+    },
+}
+
+def lookup_order(order_id: str) -> dict:
+    return ORDERS.get(order_id, {"error": f"no order found for {order_id}"})
+
+# --- ANTI-PATTERN 1: parsing text for a "done" signal ---
+def anti_pattern_parse_text_for_done() -> None:
+    response = fake_tool_use_response()
+    try:
+        # There is no text yet -- Claude just asked to call a tool.
+        text = response.content[0].text
+    except AttributeError as e:
+        print(f"BROKE as expected: {type(e).__name__}: {e}")
+        print("The first content block is a tool_use block -- it has no .text.")
+
+# --- ANTI-PATTERN 2: hardcoded iteration cap as the stop condition ---
+def anti_pattern_iteration_cap() -> None:
+    MAX_TURNS = 1  # not derived from stop_reason at all
+    for turn in range(MAX_TURNS):
+        response = responses[turn]
+        print(f"Turn {turn}: stop_reason={response.stop_reason!r} -- loop exits (cap hit)")
+    print("BROKE: stop_reason was still 'tool_use' when the cap stopped the loop.")
+
+# --- CORRECT: driven by stop_reason, needs a live ANTHROPIC_API_KEY ---
+def run_agentic_loop(user_message: str) -> str:
+    client = get_client()
+    messages = [{"role": "user", "content": user_message}]
+
+    while True:
+        response = call_claude(client, model=MODEL, tools=[LOOKUP_ORDER_TOOL], messages=messages)
+        messages.append({"role": "assistant", "content": response.content})
+        print(f"stop_reason = {response.stop_reason!r}")
+
+        if response.stop_reason == "end_turn":
+            return "".join(b.text for b in response.content if b.type == "text")
+
+        if response.stop_reason == "tool_use":
+            tool_results = []
+            for block in response.content:
+                if block.type != "tool_use":
+                    continue
+                print(f"-> calling tool {block.name}({block.input}) [tool_use_id={block.id}]")
+                result = lookup_order(**block.input)
+                # the exact tool_use_id must round-trip back
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": str(result),
+                })
+            messages.append({"role": "user", "content": tool_results})
+            continue`;
+
+const OUTPUT_LAB1 = `--- Anti-pattern 1: parsing text for a 'done' signal ---
+  BROKE as expected: AttributeError: 'types.SimpleNamespace' object has no attribute 'text'
+  The first content block is a tool_use block -- it has no .text.
+  A loop that assumes text-first content silently mishandles this turn.
+
+--- Anti-pattern 2: hardcoded iteration cap as the stop condition ---
+  Turn 0: stop_reason='tool_use' -- loop exits here (cap hit)
+  BROKE as expected: stop_reason was still 'tool_use' when the cap stopped the loop.
+  The tool call was never executed and the task never actually finished.
+
+--- Correct implementation: live call, driven by stop_reason ---
+  stop_reason = 'tool_use'
+  -> calling tool lookup_order({'order_id': 'ORD-4471'}) [tool_use_id=toolu_01HsBvmaxcU6Jz4i3FuUCqSy]
+  stop_reason = 'end_turn'
+
+  Final answer: Your order **ORD-4471** has been **shipped**!
+
+- Carrier: UPS
+- Estimated Delivery: August 30, 2026`;
+
+const CODE_LAB2 = `from claude_agent_sdk import AgentDefinition, ClaudeAgentOptions, ToolUseBlock, query
+
+SOURCES = {
+    "src-1": "A 2026 survey of 4,000 developers found AI code assistants cut "
+             "time-to-first-PR by 35% for engineers with under 2 years of tenure.",
+    "src-2": "Senior engineers (8+ years) reported only an 8% time reduction, "
+             "and 20% reported net-negative productivity from review overhead.",
+}
+
+# Task 1.2 skill: partition scope across subagents -- distinct angles, not
+# duplicated coverage of the same angle.
+RESEARCH_SUBAGENT = AgentDefinition(
+    description="Searches the internal source corpus for a specific research subtopic.",
+    prompt="You are a research subagent. You will be given ONE narrow subtopic. "
+           "Report only findings relevant to it, tagged with source id.",
+    tools=["Read"],
+    model="sonnet",
+)
+
+SYNTHESIS_SUBAGENT = AgentDefinition(
+    description="Combines findings from research subagents into a cited summary.",
+    prompt="If two findings conflict, keep BOTH and annotate the conflict "
+           "with both source ids -- never arbitrarily pick one.",
+    tools=[],
+    model="sonnet",
+)
+
+async def run_research_coordinator(topic: str) -> None:
+    options = ClaudeAgentOptions(
+        # "Agent" is what current SDK versions check; the exam blueprint
+        # calls this the "Task" mechanism -- know both.
+        allowed_tools=["Read", "Agent"],
+        agents={
+            "research-subagent": RESEARCH_SUBAGENT,
+            "synthesis-subagent": SYNTHESIS_SUBAGENT,
+        },
+    )
+    prompt = (
+        f"Research this topic using research-subagent and synthesis-subagent: {topic}\\n"
+        "Partition the sources across at least two research-subagent calls by "
+        "distinct angle so no single subagent has to cover everything. Emit "
+        "those calls in PARALLEL (one coordinator turn), then synthesize."
+    )
+
+    async for message in query(prompt=prompt, options=options):
+        for block in getattr(message, "content", None) or []:
+            if isinstance(block, ToolUseBlock) and block.name in ("Task", "Agent"):
+                print(f"-> coordinator spawned subagent: {block.input.get('subagent_type')!r}")
+        if getattr(message, "parent_tool_use_id", None):
+            print("   (message generated inside a subagent\'s own context)")
+        if hasattr(message, "result"):
+            print("--- Final synthesized report ---")
+            print(message.result)`;
+
+const CODE_LAB3 = `from claude_agent_sdk import (
+    AssistantMessage, ClaudeAgentOptions, HookMatcher, ResultMessage,
+    ToolUseBlock, create_sdk_mcp_server, query, tool,
+)
+
+REFUND_THRESHOLD_USD = 500
+session_state = {"verified_customer_id": None}
+
+@tool("get_customer", "Look up a customer and verify their identity.", {"customer_name": str})
+async def get_customer(args):
+    record = CUSTOMERS.get(args["customer_name"])
+    return {"content": [{"type": "text", "text": str(record)}]}
+
+@tool("process_refund", "Refund an amount (USD) to a verified customer_id.",
+      {"customer_id": str, "amount_usd": float})
+async def process_refund(args):
+    return {"content": [{"type": "text",
+            "text": f"Refunded \${args['amount_usd']:.2f} to {args['customer_id']}."}]}
+
+support_server = create_sdk_mcp_server(name="support", version="1.0.0",
+                                        tools=[get_customer, process_refund])
+
+# Task 1.4: programmatic prerequisite -- block process_refund until
+# get_customer has returned a VERIFIED id in this session.
+# Task 1.5: block refunds above a policy threshold too.
+async def enforce_refund_prerequisites(input_data, tool_use_id, context):
+    if input_data["tool_name"] != "mcp__support__process_refund":
+        return {}
+    tool_input = input_data["tool_input"]
+
+    if session_state["verified_customer_id"] is None:
+        return {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "process_refund requires a verified "
+                "customer_id from get_customer first -- none yet this session.",
+        }}
+
+    if tool_input.get("amount_usd", 0) > REFUND_THRESHOLD_USD:
+        return {"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": f"Refunds over \${REFUND_THRESHOLD_USD} "
+                "require human escalation per policy.",
+        }}
+    return {}  # allow
+
+# Task 1.5: PostToolUse normalizes a raw Unix timestamp into ISO 8601
+# before Claude ever reasons about it.
+async def capture_verified_customer(input_data, tool_use_id, context):
+    if input_data["tool_name"] != "mcp__support__get_customer":
+        return {}
+    record = CUSTOMERS.get(input_data["tool_input"].get("customer_name"))
+    session_state["verified_customer_id"] = record["customer_id"]
+    iso = datetime.fromtimestamp(record["joined_unix"], tz=timezone.utc).isoformat()
+    print(f"[PostToolUse] normalized joined_unix -> {iso}")
+    return {"hookSpecificOutput": {"hookEventName": "PostToolUse",
+            "additionalContext": f"(normalized) customer joined_at: {iso}"}}
+
+options = ClaudeAgentOptions(
+    mcp_servers={"support": support_server},
+    allowed_tools=["mcp__support__get_customer", "mcp__support__process_refund"],
+    hooks={
+        "PreToolUse": [HookMatcher(matcher="mcp__support__process_refund",
+                                    hooks=[enforce_refund_prerequisites])],
+        "PostToolUse": [HookMatcher(matcher="mcp__support__get_customer",
+                                     hooks=[capture_verified_customer])],
+    },
+)`;
+
+const CODE_LAB4 = `from common import MODEL, call_claude, get_client
+
+FILES = {
+    "auth.py": "def check_login(user, pw):\\n"
+               "    if user.password == pw:  # plaintext comparison\\n"
+               "        return True\\n",
+    "session.py": "def new_session(user):\\n"
+                  "    token = str(random.randint(0, 999999))  # low-entropy\\n",
+    "logout.py": "def logout(token):\\n"
+                 "    pass  # sessions dict is never cleared\\n",
+}
+
+# --- Strategy 1: PROMPT CHAINING -- fixed, ordered, predictable ---
+def review_via_chaining() -> None:
+    client = get_client()
+    print("--- Pass 1: per-file local analysis (one call per file) ---")
+    for filename, code in FILES.items():
+        response = call_claude(client, messages=[{"role": "user",
+            "content": f"Review this file for security issues.\\n\\n{filename}:\\n{code}"}])
+        finding = "".join(b.text for b in response.content if b.type == "text")
+        print(f"  {filename}: {finding.strip()[:120]}...")
+
+    print("--- Pass 2: SEPARATE cross-file integration pass ---")
+    combined = "\\n\\n".join(f"{f}:\\n{c}" for f, c in FILES.items())
+    response = call_claude(client, messages=[{"role": "user",
+        "content": f"Look ACROSS these files for issues only visible together:\\n\\n{combined}"}])
+    print(response.content[0].text[:300])
+
+# --- Strategy 2: DYNAMIC DECOMPOSITION -- model picks its own order ---
+READ_FILE_TOOL = {
+    "name": "read_file",
+    "description": "Read one file from the small codebase being audited.",
+    "input_schema": {"type": "object",
+        "properties": {"filename": {"type": "string", "enum": list(FILES.keys())}},
+        "required": ["filename"]},
+}
+
+def review_via_dynamic_decomposition() -> None:
+    client = get_client()
+    messages = [{"role": "user", "content":
+        "Audit this codebase. Read whichever files you need, in whatever order "
+        "makes sense given what you find -- you don\'t know the dependencies "
+        "ahead of time. Summarize when confident."}]
+
+    while True:
+        response = call_claude(client, tools=[READ_FILE_TOOL], messages=messages)
+        messages.append({"role": "assistant", "content": response.content})
+        if response.stop_reason == "end_turn":
+            print(f"Final summary: {response.content[0].text[:400]}")
+            return
+        tool_results = []
+        for block in response.content:
+            if block.type != "tool_use":
+                continue
+            filename = block.input["filename"]
+            print(f"-> model chose to read {filename!r} next")
+            tool_results.append({"type": "tool_result", "tool_use_id": block.id,
+                                  "content": FILES[filename]})
+        messages.append({"role": "user", "content": tool_results})`;
+
+const OUTPUT_LAB4 = `--- Pass 1: per-file local analysis (one call per file) ---
+  auth.py: Plaintext password storage/comparison - passwords should be
+  hashed with a strong algorithm (bcrypt/argon2), never compared directly...
+  session.py: Weak token generation - random.randint(0, 999999) uses a
+  non-cryptographic PRNG; tokens are guessable within ~1M attempts...
+  logout.py: Token never invalidated - the sessions dict is never cleared,
+  so a stolen token remains valid indefinitely...
+
+--- Pass 2: SEPARATE cross-file integration pass ---
+  ## Cross-File Security Analysis
+  ### Issue 1: Eternal Low-Entropy Tokens Are Trivially Brute-Forceable
+  This is the most critical cross-file finding. Each weakness is bad alone,
+  but together they form a complete attack chain: session.py generates only
+  1,000,000 possible tokens, and logout.py never invalidates them...
+
+======================================================================
+--- Dynamic decomposition: model picks its own investigation order ---
+  -> model chose to read 'auth.py' next
+  -> model chose to read 'session.py' next
+  -> model chose to read 'logout.py' next
+  Final summary: 🔴 auth.py -- Plaintext Password Comparison. The check
+  'user.password == pw' compares the submitted password directly against
+  whatever is stored, implying no hashing at rest...`;
+
+/* ---------- Quiz bank (13 original questions, tagged) ---------- */
+const QUIZ = [
+ {tag:'1.1', stem:'A junior engineer\'s agentic loop checks <code>if "I\'m done" in response.text:</code> to decide whether to stop calling tools. It works in testing, then breaks the first time the model phrases completion differently. What\'s the fix?',
+  opts:['Add more phrases to check for ("finished", "complete", "all done")','Check <code>response.stop_reason == "end_turn"</code> instead of parsing text content','Lower the temperature so phrasing is more consistent','Add a retry loop that re-asks until the exact phrase appears'],
+  correct:1, why:'<code>stop_reason</code> is structural and deterministic. Parsing text for a phrase is exactly the mistake the exam guide warns against by name; more phrases (A) just add brittleness to the same wrong mechanism.'},
+ {tag:'1.1', stem:'Tool-result code omits the <code>tool_use_id</code> field when appending a result. What happens?',
+  opts:['The API infers which tool call the result belongs to from message order','The request is rejected -- the API requires each tool_result\'s tool_use_id to match an outstanding tool_use block','Claude silently ignores the malformed result and answers from general knowledge','The SDK auto-generates a tool_use_id to patch the gap'],
+  correct:1, why:'The exact id round-trip is enforced, not inferred -- essential when a turn contains multiple tool calls.'},
+ {tag:'1.2', stem:'A coordinator decomposes "audit our onboarding funnel" into exactly one subagent task: "check the signup form." The report misses payment failures and mobile bugs entirely. Whose failure is this?',
+  opts:['The subagent\'s -- it should have looked beyond its assigned scope','The coordinator\'s -- its decomposition was too narrow and never assigned those angles to anyone','No one\'s -- only errors count as failures','The synthesis step\'s -- it should have noticed the report felt incomplete'],
+  correct:1, why:'A subagent doing its assigned job well is not a subagent failure. No agent in the system was ever assigned payment or mobile -- that\'s a decomposition gap.'},
+ {tag:'1.3', stem:'A coordinator\'s <code>allowed_tools</code> is <code>["Read", "Grep"]</code>. Delegating to a defined subagent is denied. What\'s missing?',
+  opts:['The subagent\'s own <code>tools</code> field needs "Read" added','<code>Agent</code> (the subagent-spawning tool -- the exam\'s "Task" mechanism) needs to be in the coordinator\'s <code>allowed_tools</code>','The subagent needs to be registered in a separate subagents.json file','<code>model</code> needs to be set to "opus" on the coordinator'],
+  correct:1, why:'Spawning a subagent is itself a tool call. If that tool isn\'t approved, delegation never happens regardless of subagent config.'},
+ {tag:'1.3', stem:'A coordinator has chatted for 20 turns building context, then delegates with: "Investigate the bug we discussed." What goes wrong?',
+  opts:['Nothing -- subagents automatically inherit the parent conversation','The subagent starts with almost no context -- it has no idea what bug was discussed','The API throws an error because the prompt is too vague','The subagent asks a clarifying question automatically'],
+  correct:1, why:'Unless it\'s a fork, a subagent\'s context starts fresh. Only the prompt string you hand it crosses the boundary.'},
+ {tag:'1.4', stem:'A fintech agent\'s system prompt says "Always verify identity before refunding." Logs show verification skipped in 1 of 8 cases. Correct fix?',
+  opts:['Stronger prompt wording ("NEVER skip this, CRITICAL")','Prompt-based instructions have a non-zero failure rate; add a programmatic prerequisite gate blocking the refund tool until verification actually returns a verified ID','Switch to a more capable model','Add a few-shot example showing correct order'],
+  correct:1, why:'This is the exam guide\'s own headline example. Financial consequence + non-zero prompt failure rate = enforce in code, not prose.'},
+ {tag:'1.4', stem:'An agent escalates with: "Customer has a billing issue, please help." The human has no transcript access and starts from zero. What\'s missing?',
+  opts:['Nothing -- humans are expected to re-investigate every case','A structured handoff: customer details, root cause already found, recommended action','A confidence score attached to the escalation','An apology for the inconvenience'],
+  correct:1, why:'The value of an agent that already investigated is lost if the handoff throws that work away.'},
+ {tag:'1.5', stem:'Three backends return timestamps as Unix epoch, ISO 8601, and relative text respectively. The agent frequently miscalculates deadlines. Most targeted fix?',
+  opts:['Tell the model in the prompt to "convert timestamps to a consistent format"','A <code>PostToolUse</code> hook that normalizes each tool\'s output into one format before the model sees it','Migrate all three backends to the same format','Give the model a calculator tool'],
+  correct:1, why:'PostToolUse intercepts and transforms tool results deterministically, before they reach context -- exactly the normalization pattern described.'},
+ {tag:'1.5', stem:'Refunds over $500 must require human approval with zero exceptions, regardless of prompting. Where does this rule belong?',
+  opts:['In the system prompt, worded as an absolute rule','In a <code>PreToolUse</code> hook that inspects the call\'s arguments and denies/redirects over the threshold','In a few-shot example showing a refusal','In the tool\'s description field'],
+  correct:1, why:'"Zero exceptions regardless of prompting" is definitionally an enforcement requirement -- only code the model can\'t talk around satisfies it.'},
+ {tag:'1.6', stem:'A PR review pipeline has a fixed, always-the-same shape: lint, then coverage, then security scan, always in that order. What decomposition strategy fits?',
+  opts:['Dynamic decomposition -- let the model decide order','Prompt chaining -- a fixed, ordered sequence matching the known steps','A single call asking for all three at once','Multi-agent orchestration with a coordinator'],
+  correct:1, why:'When steps are fully known and always the same, prompt chaining is simpler, more predictable, and cheaper than dynamic decomposition or a coordinator.'},
+ {tag:'1.6', stem:'"Investigate why checkout conversion dropped last week" -- the right places to look aren\'t knowable in advance. What fits, and why is chaining wrong here?',
+  opts:['Prompt chaining -- check UI, then payments, then pricing, fixed order every time','Dynamic decomposition -- let the model investigate, form hypotheses, and decide what to check next','Chaining, because it\'s cheaper and open-ended tasks should still be bounded','Neither -- use a single unstructured prompt with no tools'],
+  correct:1, why:'The useful next step depends on what\'s found at each point -- exactly the case dynamic, tool-driven decomposition exists for.'},
+ {tag:'1.7', stem:'A developer resumes a named session after a teammate refactored two already-analyzed files overnight, without mentioning the refactor. Risk?',
+  opts:['None -- Claude Code auto-detects file changes on resume','The session may reason from stale prior findings about those two files, unaware they changed','The resume command fails outright','Claude Code discards the entire session history to be safe'],
+  correct:1, why:'Resumption doesn\'t auto-verify prior reads against disk. You must brief the resumed session on what changed so it does a targeted re-read.'},
+ {tag:'1.7', stem:'A developer wants to compare two fix strategies from one shared baseline analysis, without either polluting the other, and without redoing the baseline twice. Right mechanism?',
+  opts:['Two separate sessions, each redoing the baseline from scratch','<code>fork_session</code> twice from the same baseline session, one per strategy','One session, asking about both strategies together','<code>--resume</code> twice in sequence in the same session'],
+  correct:1, why:'Forking gives each branch the shared baseline for free while keeping explorations independent -- exactly the divergent-approaches use case.'},
+];
+
+/* =========================================================================
+   RENDER: sidebar + section shells
+   ========================================================================= */
+
+const nav = document.getElementById('nav');
+SECTIONS.forEach(s => {
+  const el = document.createElement('div');
+  el.className = 'navitem';
+  el.dataset.target = s.id;
+  el.innerHTML = '<span class="dot"></span>' + (s.num ? '<span class="n">'+s.num+'</span>' : '<span class="n"></span>') + '<span>'+s.label+'</span>';
+  el.onclick = () => showSection(s.id);
+  nav.appendChild(el);
+});
+
+const main = document.getElementById('main');
+
+function stepperHTML(prefix){
+  return '<div class="card"><div class="stage" id="'+prefix+'-stage"></div>'+
+    '<div class="controls"><button id="'+prefix+'-prev">&larr; Prev</button>'+
+    '<button id="'+prefix+'-next" class="primary">Next &rarr;</button>'+
+    '<button id="'+prefix+'-play">&#9654; Auto-play</button>'+
+    '<span class="step-label" id="'+prefix+'-label"></span></div></div>';
+}
+
+function codePanelHTML(id, code, output, needsSetup){
+  let html = '<div><div class="codebar"><span>'+id+'.py</span>'+
+    '<span class="status '+(needsSetup?'setup':'live')+'">'+(needsSetup?'needs local setup':'verified live')+'</span></div>'+
+    '<pre class="code">'+pyHighlight(code)+'</pre></div>';
+  if (output){
+    html += '<div class="output">' + esc(output).replace(/^(--- .* ---)$/gm, '<span class="tag">$1</span>') + '</div>';
+  } else if (needsSetup) {
+    html += '<div class="setup-note"><b>This exact Python file</b> needs <code>pip install claude-agent-sdk</code> '+
+      'plus the Claude Code CLI configured with credentials to run (it shells out to the CLI, unlike the '+
+      'direct-HTTPS labs) — but the "Run it for real" panel above uses the same mechanism, reimplemented with '+
+      'direct API calls, so you can see it live right here first.</div>';
+  }
+  return html;
+}
+
+/* ---------- Live-run panels (real fetch() calls to the Claude API) ---------- */
+
+function liveRunHTML(opts){
+  // opts: {id, title, body, controlsHTML, consoleId}
+  return '<div class="livecard"><div class="livehead"><span class="badge">Run it for real</span>'+
+    '<b>'+opts.title+'</b></div>'+
+    '<p style="font-size:13px;color:var(--ink-soft);margin:6px 0 0;">'+opts.body+'</p>'+
+    '<div class="runbar">'+opts.controlsHTML+'</div>'+
+    '<pre class="console" id="'+opts.consoleId+'"></pre></div>';
+}
+
+function loopRunHTML(){
+  return liveRunHTML({
+    title: 'The exact loop from lab1_agentic_loop.py — live.',
+    body: 'Ask about an order. Every real request, every real stop_reason, every real tool call happens right here.',
+    controlsHTML:
+      '<input type="text" id="loop-input" value="What\'s the status of order ORD-4471?">'+
+      '<button class="run" id="loop-run">&#9654; Run live</button>',
+    consoleId: 'loop-console',
+  });
+}
+
+function decompRunHTML(){
+  return liveRunHTML({
+    title: 'Same task, both strategies from lab4_decomposition.py — live.',
+    body: 'Reviews the same 3 small files for security issues, two different ways. Watch the model actually choose its own reading order in the dynamic run.',
+    controlsHTML:
+      '<button class="run" id="chain-run">&#9654; Run chaining</button>'+
+      '<button class="run" id="dynamic-run">&#9654; Run dynamic</button>',
+    consoleId: 'decomp-console',
+  });
+}
+
+function coordRunHTML(){
+  return liveRunHTML({
+    title: 'Coordinator + 2 isolated subagents + synthesis — live, in parallel.',
+    body: 'Two real, separate API calls run concurrently (isolated context, no shared history), then a third call synthesizes both — timed, so you can see the parallel win.',
+    controlsHTML: '<button class="run" id="coord-run">&#9654; Run live</button>',
+    consoleId: 'coord-console',
+  });
+}
+
+function hookRunHTML(){
+  return liveRunHTML({
+    title: 'The refund gate from lab3 — reimplemented directly in this page\'s JavaScript.',
+    body: 'Note: the real Agent SDK enforces this with a PreToolUse/PostToolUse hook in Python (see the code panel below for that exact syntax). A hook can\'t run inside a browser tab, so this demo applies the identical gate logic in plain JS, in front of the same live model — same enforcement, same outcome, transparent implementation. Scenario A forces the risky tool call via <code>tool_choice</code> so the gate fires every time — a well-behaved model often declines on its own, which is good, but does not prove the code-level gate actually exists.',
+    controlsHTML:
+      '<button class="run" id="scenario-a">&#9654; Scenario A — forced skip (gate should deny)</button>'+
+      '<button class="run" id="scenario-b">&#9654; Scenario B — verify, then refund</button>'+
+      '<button class="run" id="scenario-c">&#9654; Scenario C — over the $500 threshold</button>',
+    consoleId: 'hook-console',
+  });
+}
+
+function quizMini(tag){
+  const items = QUIZ.filter(q => q.tag === tag);
+  if (!items.length) return '';
+  let html = '<h3>Check yourself</h3>';
+  items.forEach((q, i) => { html += quizCardHTML(q, tag+'-'+i); });
+  return html;
+}
+
+window.quizByUid = {};
+function quizCardHTML(q, uid){
+  window.quizByUid[uid] = q;
+  let opts = q.opts.map((o,i) =>
+    '<button class="opt" data-idx="'+i+'" onclick="answerQuiz(\''+uid+'\','+i+','+q.correct+')">'+o+'</button>'
+  ).join('');
+  return '<div class="qcard" id="q-'+uid+'"><span class="qtag">Task '+q.tag+'</span>'+
+    '<div class="qstem">'+q.stem+'</div>'+opts+
+    '<div class="explain" id="ex-'+uid+'"><b>Why:</b> '+q.why+'</div></div>';
+}
+
+window.quizState = {};
+function markCardAnswered(card, picked, correct){
+  card.dataset.answered = '1';
+  const btns = card.querySelectorAll('.opt');
+  btns.forEach((b,i) => {
+    b.disabled = true;
+    if (i === correct) b.classList.add('correct');
+    else if (i === picked) b.classList.add('wrong');
+  });
+  const ex = document.getElementById('ex-'+card.id.slice(2));
+  if (ex) ex.classList.add('shown');
+}
+function answerQuiz(uid, picked, correct){
+  const card = document.getElementById('q-'+uid);
+  if (card.dataset.answered) return;
+  markCardAnswered(card, picked, correct);
+  window.quizState[uid] = {picked: picked, correct: picked === correct};
+  updateQuizSummary();
+  saveProgress();
+}
+
+function updateQuizSummary(){
+  const el = document.getElementById('quiz-summary');
+  if (!el) return;
+  const answered = Object.keys(window.quizState).length;
+  const correct = Object.values(window.quizState).filter(v => v.correct).length;
+  if (answered === 0){
+    el.innerHTML = '<div class="detail">Answer all 13 to see your score and which task statements to revisit.</div>';
+    return;
+  }
+  const pct = Math.round(100*correct/answered);
+  let advice = '';
+  if (answered === QUIZ.length){
+    const weakTags = {};
+    QUIZ.forEach((q,i) => { const uid = 'full-'+i; const v = window.quizState[uid]; if (v && !v.correct) weakTags[q.tag] = true; });
+    const weak = Object.keys(weakTags);
+    advice = weak.length ? ('Revisit: <b>Task ' + weak.join(', ') + '</b> before moving on.') : '<b>Clean sweep.</b> Ready for Module 2.';
+  } else {
+    advice = (QUIZ.length - answered) + ' left.';
+  }
+  el.innerHTML = '<div class="score">'+correct+'/'+answered+'</div><div class="detail">'+pct+'% correct so far.<br>'+advice+'</div>';
+}
+
+/* =========================================================================
+   SECTION CONTENT
+   ========================================================================= */
+
+function renderOverview(){
+  return '<h2>Domain 1 — Agentic Architecture &amp; Orchestration</h2>'+
+  '<p class="dek">27% of the CCAR-F exam — the single largest domain. This app is built directly '+
+  'from Anthropic\'s own Exam Guide: 7 task statements, each with a working lab, an interactive '+
+  'walkthrough, and questions in the exam\'s applied-scenario register.</p>'+
+  '<div class="card"><h3 style="margin-top:0">The 7 task statements</h3><ul style="line-height:2;font-size:14px;padding-left:20px;">'+
+  '<li><b>1.1</b> Design and implement agentic loops for autonomous task execution</li>'+
+  '<li><b>1.2</b> Orchestrate multi-agent systems with coordinator-subagent patterns</li>'+
+  '<li><b>1.3</b> Configure subagent invocation, context passing, and spawning</li>'+
+  '<li><b>1.4</b> Implement multi-step workflows with enforcement and handoff patterns</li>'+
+  '<li><b>1.5</b> Apply Agent SDK hooks for tool call interception and data normalization</li>'+
+  '<li><b>1.6</b> Design task decomposition strategies for complex workflows</li>'+
+  '<li><b>1.7</b> Manage session state, resumption, and forking</li></ul></div>'+
+  '<div class="card"><h3 style="margin-top:0">How to use this</h3><p style="font-size:14px;line-height:1.7;margin:0;">'+
+  'Go section by section down the left sidebar. Each one has: the concept in exam-relevant terms, an '+
+  'interactive step-through of the mechanism, the actual lab code (two labs verified live against a '+
+  'real Claude API call — you can see the real output), and questions in that section\'s exact style. '+
+  'Finish with the full 13-question quiz — it tells you exactly which task statements to revisit.</p></div>';
+}
+
+function renderT11(){
+  return '<div class="taghead"><span class="pill">Task 1.1</span></div>'+
+  '<h2>Design and implement agentic loops</h2>'+
+  '<p class="dek">The loop lifecycle: send a request &rarr; inspect <code>stop_reason</code> &rarr; if '+
+  '<code>tool_use</code>, run the tool and append the result &rarr; send again &rarr; repeat until '+
+  '<code>end_turn</code>.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>The agentic loop lifecycle: send &rarr; inspect <code>stop_reason</code> (<code>tool_use</code> vs <code>end_turn</code>) &rarr; execute &rarr; return results for the next iteration</li>'+
+  '<li>Tool results are appended to conversation history so the model can reason about the next action</li>'+
+  '<li>Model-driven decision-making (Claude reasons about the next tool call) vs. pre-configured decision trees</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Continue on <code>tool_use</code>, terminate on <code>end_turn</code> — nothing else</li>'+
+  '<li>Add tool results to context between iterations, matched by the exact <code>tool_use_id</code></li>'+
+  '<li><b>The wrong way:</b> parsing natural-language signals for termination, arbitrary iteration caps as the primary stop mechanism, checking assistant text content as a completion indicator</li></ul></div>'+
+  '<div class="note-inline"><b>What "the wrong way" means below:</b> an approach that looks reasonable, compiles '+
+  'fine, and might even pass a quick manual test — but breaks in a specific, predictable way once real traffic '+
+  'hits it. We show it breaking on purpose so you recognize the shape of it instantly, whether in your own code '+
+  'or in an exam scenario.</div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('loop')+
+  '<h3>Run it for real</h3>'+loopRunHTML()+
+  '<h3>The actual lab — <code>lab1_agentic_loop.py</code></h3>'+
+  '<div class="card">'+codePanelHTML('lab1', CODE_LAB1, OUTPUT_LAB1, false)+'</div>'+
+  quizMini('1.1');
+}
+
+function renderT12(){
+  return '<div class="taghead"><span class="pill">Tasks 1.2 &amp; 1.3</span></div>'+
+  '<h2>Coordinator-subagent orchestration</h2>'+
+  '<p class="dek">Hub-and-spoke: the coordinator owns all inter-subagent communication, routing, and '+
+  'error handling. Subagents run in isolated context and receive only what\'s in the prompt they\'re given.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Hub-and-spoke: coordinator manages all communication, error handling, routing</li>'+
+  '<li>Subagents have isolated context — they do <b>not</b> auto-inherit the coordinator\'s history</li>'+
+  '<li>Risk of overly narrow decomposition: incomplete coverage of broad topics</li>'+
+  '<li>The <code>Agent</code>/<code>Task</code> tool spawns subagents; coordinator\'s <code>allowed_tools</code> must include it</li>'+
+  '<li><code>AgentDefinition</code>: description, prompt, tool restrictions, model, per subagent type</li>'+
+  '<li><code>fork_session</code>: divergent branches from a shared analysis baseline</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Partition scope across subagents by distinct angle to minimize duplication</li>'+
+  '<li>Iterative refinement: coordinator evaluates synthesis for gaps, re-delegates with targeted queries</li>'+
+  '<li>Include complete prior findings directly in the subagent\'s prompt — nothing crosses automatically</li>'+
+  '<li>Separate content from metadata (source URLs, dates) so attribution survives synthesis</li>'+
+  '<li>Emit multiple <code>Agent</code> calls in <b>one</b> turn to run subagents in parallel</li></ul></div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('coord')+
+  '<h3>Run it for real</h3>'+coordRunHTML()+
+  '<h3>The actual lab — <code>lab2_coordinator_subagents.py</code></h3>'+
+  '<div class="card">'+codePanelHTML('lab2', CODE_LAB2, null, true)+'</div>'+
+  quizMini('1.2')+quizMini('1.3');
+}
+
+function renderT14(){
+  return '<div class="taghead"><span class="pill">Tasks 1.4 &amp; 1.5</span></div>'+
+  '<h2>Enforcement, handoffs &amp; hooks</h2>'+
+  '<p class="dek">The exam guide\'s own headline example: a support agent skips identity verification '+
+  'in 12% of cases because the rule lived only in a prompt. The fix is architectural, not rhetorical.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Programmatic enforcement (hooks, prerequisite gates) vs. prompt-based guidance</li>'+
+  '<li>Prompt instructions have a non-zero failure rate — unacceptable when consequences are real (financial, compliance)</li>'+
+  '<li>Structured handoff protocols: customer details, root cause, recommended action</li>'+
+  '<li><code>PreToolUse</code> hooks intercept outgoing calls (can deny); <code>PostToolUse</code> hooks intercept results (can transform)</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Block downstream tool calls until a prerequisite step has actually completed</li>'+
+  '<li>Decompose multi-concern requests into distinct items, investigate each, synthesize one reply</li>'+
+  '<li>Compile structured handoff summaries for humans without transcript access</li>'+
+  '<li>Normalize heterogeneous data formats (timestamps, status codes) via <code>PostToolUse</code></li>'+
+  '<li>Block policy-violating actions (e.g. refunds over a threshold) and redirect to escalation</li></ul></div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('hook')+
+  '<h3>Run it for real</h3>'+hookRunHTML()+
+  '<h3>The actual lab — <code>lab3_enforcement_hooks.py</code></h3>'+
+  '<div class="card">'+codePanelHTML('lab3', CODE_LAB3, null, true)+'</div>'+
+  quizMini('1.4')+quizMini('1.5');
+}
+
+function renderT16(){
+  return '<div class="taghead"><span class="pill">Task 1.6</span></div>'+
+  '<h2>Task decomposition strategies</h2>'+
+  '<p class="dek">Same underlying task, two shapes: a fixed, ordered pipeline (prompt chaining) when '+
+  'the steps are knowable in advance, or dynamic, tool-driven decomposition when they aren\'t.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Fixed sequential pipelines (chaining) vs. dynamic adaptive decomposition based on intermediate findings</li>'+
+  '<li>Chaining pattern: per-file/per-aspect passes, then a separate cross-file integration pass</li>'+
+  '<li>Dynamic plans generate subtasks based on what\'s discovered at each step</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Chaining for predictable multi-aspect reviews; dynamic for open-ended investigation</li>'+
+  '<li>Split large reviews into local per-file passes plus integration passes to avoid attention dilution</li>'+
+  '<li>Decompose open-ended tasks by mapping structure first, then building a plan that adapts</li></ul></div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('decomp')+
+  '<h3>Run it for real</h3>'+decompRunHTML()+
+  '<h3>The actual lab — <code>lab4_decomposition.py</code></h3>'+
+  '<div class="card">'+codePanelHTML('lab4', CODE_LAB4, OUTPUT_LAB4, false)+'</div>'+
+  quizMini('1.6');
+}
+
+function renderT17(){
+  return '<div class="taghead"><span class="pill">Task 1.7</span></div>'+
+  '<h2>Session state, resumption &amp; forking</h2>'+
+  '<p class="dek">A Claude Code CLI feature, not a raw-API concept. The judgment call the exam tests: '+
+  'resume-and-brief vs. start-fresh-with-a-summary, and when to fork instead of resume.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Named resumption: <code>--resume &lt;session-name&gt;</code> continues a specific prior conversation</li>'+
+  '<li><code>fork_session</code>: independent branches from a shared baseline, for divergent approaches</li>'+
+  '<li>Resuming after code changes without briefing the session risks stale reasoning</li>'+
+  '<li>Starting fresh with a structured summary beats resuming with stale tool results</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Use <code>--resume</code> with session names across work sessions when prior context is still valid</li>'+
+  '<li>Use <code>fork_session</code> to compare approaches from one shared analysis</li>'+
+  '<li>Inform a resumed session about specific file changes for a targeted re-read, not full re-exploration</li></ul></div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('sess')+
+  '<h3>Try it yourself — Claude Code CLI</h3>'+
+  '<div class="card"><pre class="code" style="max-height:none;">'+esc(
+`# 1. Start a named investigation
+claude --session-name "auth-audit" -p "Read auth.py and list every issue."
+
+# 2. Resume it later -- briefed, because auth.py changed since
+claude --resume "auth-audit" -p "auth.py now uses bcrypt (see diff below). \\
+Re-check just that function; the rest of your prior findings still stand.
+
+<paste diff>"
+
+# 3. Fork the same baseline two ways to compare fix strategies
+claude --resume "auth-audit" --fork-session --session-name "fix-secrets" \\
+  -p "Propose a fix using Python\'s secrets module."
+claude --resume "auth-audit" --fork-session --session-name "fix-jwt" \\
+  -p "Propose a fix using signed JWTs instead."`
+  )+'</pre></div>'+
+  quizMini('1.7');
+}
+
+function renderCapstones(){
+  return '<h2>Capstones</h2>'+
+  '<p class="dek">Original walkthroughs of the two official CCAR-F prep exercises that map onto Domain 1 '+
+  '— Anthropic\'s own guide tells candidates to build these before sitting the exam.</p>'+
+  '<div class="card"><h3 style="margin-top:0">A — Multi-tool agent with escalation logic</h3>'+
+  '<p style="font-size:13.5px;color:var(--ink-soft);margin-top:-6px;">Reinforces 1.1, 1.4, 1.5 · plus Domain 2 &amp; 5</p>'+
+  '<ul class="steplist" id="cap-a">'+
+  ['Start from lab1\'s stop_reason loop + lab3\'s get_customer/process_refund tools',
+   'Add lookup_order and escalate_to_human, with descriptions that clearly differentiate each tool',
+   'Reuse lab3\'s PreToolUse prerequisite gate + threshold gate',
+   'Test a genuine multi-concern message ("late order AND double-charged") — verify it decomposes into distinct items',
+   'Test escalation triggers: right (explicit request, policy gap, no progress) vs. wrong (confidence score, sentiment)'
+  ].map((t,i)=>'<li><input type="checkbox" onchange="toggleCap(this)"><span>'+t+'</span></li>').join('')+
+  '</ul></div>'+
+  '<div class="card"><h3 style="margin-top:0">B — Multi-agent research pipeline</h3>'+
+  '<p style="font-size:13.5px;color:var(--ink-soft);margin-top:-6px;">Reinforces 1.2, 1.3, 1.6 · plus Domain 2 &amp; 5</p>'+
+  '<ul class="steplist" id="cap-b">'+
+  ['Start from lab2\'s coordinator + research/synthesis subagents',
+   'Reproduce the exam\'s own failure mode: decompose a broad topic into subtasks that are all one narrow angle',
+   'Fix the decomposition to partition by genuinely distinct angle; confirm the coverage gap closes',
+   'Simulate a subagent failure — verify structured error context reaches the coordinator, not a generic message',
+   'Feed synthesis two conflicting sources — confirm both survive with attribution, not an averaged answer'
+  ].map((t,i)=>'<li><input type="checkbox" onchange="toggleCap(this)"><span>'+t+'</span></li>').join('')+
+  '</ul></div>';
+}
+
+function renderQuiz(){
+  let html = '<h2>Practice Quiz</h2><p class="dek">13 original, scenario-style questions across all 7 task '+
+  'statements. Answer them cold — the summary at the top tells you exactly which task statements to revisit.</p>'+
+  '<div class="quiz-summary" id="quiz-summary"><div class="detail">Answer all 13 to see your score.</div></div>';
+  QUIZ.forEach((q,i) => { html += quizCardHTML(q, 'full-'+i); });
+  return html;
+}
+
+const RENDERERS = {
+  overview: renderOverview, t11: renderT11, t12: renderT12, t14: renderT14,
+  t16: renderT16, t17: renderT17, capstones: renderCapstones, quiz: renderQuiz,
+};
+
+/* =========================================================================
+   NAVIGATION + PROGRESS
+   ========================================================================= */
+
+let visited = {};
+function loadProgress(){
+  try { visited = JSON.parse(localStorage.getItem('ccarf-d1-progress') || '{}'); } catch(e) { visited = {}; }
+  try { window.quizState = JSON.parse(localStorage.getItem('ccarf-d1-quiz') || '{}'); } catch(e) { window.quizState = {}; }
+}
+function saveProgress(){
+  try { localStorage.setItem('ccarf-d1-progress', JSON.stringify(visited)); } catch(e) {}
+  try { localStorage.setItem('ccarf-d1-quiz', JSON.stringify(window.quizState)); } catch(e) {}
+}
+function updateProgressUI(){
+  const total = SECTIONS.length;
+  const done = SECTIONS.filter(s => visited[s.id]).length;
+  document.getElementById('progbar').style.width = Math.round(100*done/total) + '%';
+  const qAnswered = Object.keys(window.quizState||{}).filter(k=>k.startsWith('full-')).length;
+  document.getElementById('progcount').textContent = done + ' / ' + total + ' sections' +
+    (qAnswered ? ' · quiz ' + qAnswered + '/' + QUIZ.length : ' · quiz not started');
+  document.querySelectorAll('.navitem').forEach(el => {
+    el.classList.toggle('done', !!visited[el.dataset.target]);
+  });
+}
+
+function showSection(id){
+  visited[id] = true;
+  saveProgress();
+  document.querySelectorAll('.navitem').forEach(el => el.classList.toggle('active', el.dataset.target === id));
+  main.innerHTML = RENDERERS[id]();
+  window.scrollTo(0,0);
+  updateProgressUI();
+  if (id === 'quiz') updateQuizSummary();
+  // Re-apply answered state for quiz cards the student already answered on a
+  // prior visit, so navigating away and back doesn\'t reset their progress.
+  document.querySelectorAll('.qcard').forEach(card => {
+    const uid = card.id.slice(2);
+    const state = window.quizState[uid];
+    const q = window.quizByUid[uid];
+    if (state && q){
+      markCardAnswered(card, state.picked, q.correct);
+    }
+  });
+  attachSteppers(id);
+  attachLiveRunners(id);
+}
+
+window.toggleCap = function(cb){
+  cb.parentElement.querySelector('span').classList.toggle('doneline', cb.checked);
+};
+
+/* =========================================================================
+   VISUALIZERS (steppers)
+   ========================================================================= */
+
+function buildStepper(prefix, steps){
+  let i = 0, playing = null;
+  const stage = document.getElementById(prefix+'-stage');
+  if (!stage) return;
+  const label = document.getElementById(prefix+'-label');
+  const prev = document.getElementById(prefix+'-prev');
+  const next = document.getElementById(prefix+'-next');
+  const play = document.getElementById(prefix+'-play');
+  function render(){
+    stage.innerHTML = steps[i].html;
+    label.textContent = 'Step '+(i+1)+' / '+steps.length+' — '+steps[i].caption;
+    prev.disabled = i === 0;
+    next.disabled = i === steps.length-1;
+    if (i === steps.length-1 && playing){ clearInterval(playing); playing=null; play.textContent='\u25B6 Auto-play'; }
+  }
+  prev.onclick = () => { i = Math.max(0,i-1); render(); };
+  next.onclick = () => { i = Math.min(steps.length-1,i+1); render(); };
+  play.onclick = () => {
+    if (playing){ clearInterval(playing); playing=null; play.textContent='\u25B6 Auto-play'; return; }
+    if (i === steps.length-1) i = 0;
+    play.textContent = '\u23F8 Pause';
+    playing = setInterval(() => {
+      if (i >= steps.length-1){ clearInterval(playing); playing=null; play.textContent='\u25B6 Auto-play'; return; }
+      i++; render();
+    }, 1700);
+  };
+  render();
+}
+
+const STEPS_LOOP = [
+ {caption:'User sends a request', html:'<div class="node active"><div class="node-title">User &rarr; Claude</div><div class="node-body">"What\'s the status of order <code>ORD-4471</code>?"</div></div>'},
+ {caption:'stop_reason = tool_use', html:'<div class="node good"><div class="node-title">Claude response</div><div class="node-body"><code>stop_reason: "tool_use"</code><br>tool_use: <code>lookup_order({order_id: "ORD-4471"})</code><br><code>id: toolu_01Abc</code></div></div><div class="arrow">&darr; loop continues</div>'},
+ {caption:'Your code executes the tool', html:'<div class="node active"><div class="node-title">Your code (not the model)</div><div class="node-body">Executes <code>lookup_order("ORD-4471")</code> &rarr; <code>{status: "shipped", carrier: "UPS"}</code></div></div>'},
+ {caption:'Result appended with matching tool_use_id', html:'<div class="node active"><div class="node-title">You &rarr; Claude</div><div class="node-body"><code>tool_use_id: toolu_01Abc</code> &larr; must match exactly<br><code>content: "shipped, UPS, ETA Aug 30"</code></div></div><div class="arrow">&darr; call again with full history</div>'},
+ {caption:'stop_reason = end_turn', html:'<div class="node good"><div class="node-title">Claude response</div><div class="node-body"><code>stop_reason: "end_turn"</code><br>"Your order has shipped via UPS, ETA Aug 30."</div></div><div class="arrow">&darr; done.</div>'},
+ {caption:'Two common mistakes, breaking on purpose', html:'<div class="row"><div class="node bad"><div class="node-title">The wrong way #1</div><div class="node-body">Parse assistant <b>text</b> for "done". Fails: the block above had no <code>.text</code> at all.</div></div><div class="node bad"><div class="node-title">The wrong way #2</div><div class="node-body">Hardcoded turn cap. Fails: cap hits while <code>stop_reason</code> is still <code>tool_use</code>.</div></div></div>'},
+];
+
+const STEPS_COORD = [
+ {caption:'Coordinator receives the task', html:'<div class="node active"><div class="node-title">Coordinator</div><div class="node-body">"Research how AI code assistants affect developer productivity."<br><code>allowed_tools</code> includes <code>Agent</code></div></div>'},
+ {caption:'Partitions by angle, not one giant subtask', html:'<div class="node good"><div class="node-title">Decomposition</div><div class="node-body">&bull; subagent A: junior-developer velocity<br>&bull; subagent B: senior-developer / quality<br>Narrow decomposition risk: missing angles no one was assigned.</div></div>'},
+ {caption:'Both spawned in ONE turn — run in parallel', html:'<div class="row"><div class="node active"><div class="node-title">Subagent A — isolated</div><div class="node-body">Only the handed prompt — not the coordinator\'s history. <code>tools=["Read"]</code></div></div><div class="node active"><div class="node-title">Subagent B — isolated</div><div class="node-body">Runs concurrently — both <code>Agent</code> calls were in the same turn.</div></div></div>'},
+ {caption:'Each returns an attributable finding', html:'<div class="row"><div class="node good"><div class="node-title">A\'s finding</div><div class="node-body">"35% faster time-to-first-PR for juniors" — <code>src-1</code></div></div><div class="node good"><div class="node-title">B\'s finding</div><div class="node-body">"20% net-negative from review overhead" — <code>src-2</code></div></div></div>'},
+ {caption:'Synthesis preserves conflicts, doesn\'t erase them', html:'<div class="node active"><div class="node-title">Synthesis subagent</div><div class="node-body">Junior gains vs. senior overhead — <b>both</b> kept, with attribution. Never arbitrarily picked one.</div></div>'},
+];
+
+const STEPS_HOOK = [
+ {caption:'Agent tries process_refund early', html:'<div class="node active"><div class="node-title">tool_use request</div><div class="node-body"><code>process_refund({customer_id: "CUST-9931", amount_usd: 75})</code> — without calling <code>get_customer</code> first.</div></div>'},
+ {caption:'PreToolUse fires BEFORE the tool runs', html:'<div class="node active"><div class="node-title">PreToolUse hook</div><div class="node-body">Checks session state: has <code>get_customer</code> verified an id yet? <b>No.</b></div></div>'},
+ {caption:'Hook denies — tool never executes', html:'<div class="node bad"><div class="node-title">Hook decision</div><div class="node-body"><code>permissionDecision: "deny"</code><br>Enforced in code, not requested in a prompt.</div></div>'},
+ {caption:'Contrast: prompt-only guidance', html:'<div class="node bad"><div class="node-title">What a system prompt gives you instead</div><div class="node-body">"Always verify first" — the model <i>usually</i> complies. Real observed failure rate: 12%. Non-zero + financial = enforce in code.</div></div>'},
+ {caption:'Correct flow: verify, then refund succeeds', html:'<div class="node good"><div class="node-title">get_customer runs first</div><div class="node-body">Verified id returned. PostToolUse also normalizes a raw Unix timestamp to ISO 8601.</div></div><div class="arrow">&darr;</div><div class="node good"><div class="node-title">process_refund passes the gate</div><div class="node-body">Id matches, amount under $500 &rarr; hook returns <code>{}</code> &rarr; refund executes.</div></div>'},
+];
+
+const STEPS_DECOMP = [
+ {caption:'The task: review 3 files for security issues', html:'<div class="node active"><div class="node-title">Same task, two strategies</div><div class="node-body">auth.py, session.py, logout.py — steps are either knowable in advance, or not.</div></div>'},
+ {caption:'Strategy 1: prompt chaining', html:'<div class="row"><div class="node good"><div class="node-title">Pass 1 (fixed, one call per file)</div><div class="node-body">auth.py &rarr; session.py &rarr; logout.py, always in that order</div></div><div class="node good"><div class="node-title">Pass 2 (separate)</div><div class="node-body">Cross-file integration pass — finds the token+logout combo attack chain</div></div></div>'},
+ {caption:'Strategy 2: dynamic decomposition', html:'<div class="node active"><div class="node-title">Model picks its own order</div><div class="node-body">Given a <code>read_file</code> tool, the model decides what to open next based on what it just found — no fixed order.</div></div>'},
+ {caption:'When each strategy is right', html:'<div class="row"><div class="node good"><div class="node-title">Use chaining when</div><div class="node-body">Steps are fully known and always the same — a fixed PR review pipeline.</div></div><div class="node good"><div class="node-title">Use dynamic when</div><div class="node-body">The right next step depends on what\'s found — an open-ended investigation.</div></div></div>'},
+];
+
+const STEPS_SESS = [
+ {caption:'Day 1: start a named session', html:'<div class="node active"><div class="node-title">claude --session-name "auth-audit"</div><div class="node-body">Investigates auth.py, builds up findings.</div></div>'},
+ {caption:'Overnight: a teammate refactors the file', html:'<div class="node bad"><div class="node-title">File changed on disk</div><div class="node-body">The session\'s prior findings about auth.py are now stale — but it doesn\'t know that yet.</div></div>'},
+ {caption:'Un-briefed resume: risk', html:'<div class="node bad"><div class="node-title">claude --resume "auth-audit" (no mention of the change)</div><div class="node-body">May reason from stale findings about the refactored file.</div></div>'},
+ {caption:'Briefed resume: correct', html:'<div class="node good"><div class="node-title">claude --resume "auth-audit" + "auth.py changed, here\'s the diff"</div><div class="node-body">Does a <b>targeted re-read</b> of just what changed — rest of the context stays valid.</div></div>'},
+ {caption:'Comparing two fixes: fork, don\'t duplicate', html:'<div class="row"><div class="node good"><div class="node-title">--fork-session "fix-secrets"</div><div class="node-body">Shares the baseline analysis for free.</div></div><div class="node good"><div class="node-title">--fork-session "fix-jwt"</div><div class="node-body">Independent — doesn\'t see the other branch\'s reasoning.</div></div></div>'},
+];
+
+function attachSteppers(id){
+  if (id === 't11') buildStepper('loop', STEPS_LOOP);
+  if (id === 't12') buildStepper('coord', STEPS_COORD);
+  if (id === 't14') buildStepper('hook', STEPS_HOOK);
+  if (id === 't16') buildStepper('decomp', STEPS_DECOMP);
+  if (id === 't17') buildStepper('sess', STEPS_SESS);
+}
+
+/* =========================================================================
+   LIVE-RUN HANDLERS — real fetch() calls to the Claude API, run when a
+   student clicks a "Run live" button. Mirrors the matching Python lab
+   exactly, just executed in the browser instead of a terminal.
+   ========================================================================= */
+
+const ORDERS_JS = {"ORD-4471": {status: "shipped", carrier: "UPS", eta: "2026-08-30"}};
+const LOOKUP_TOOL_JS = {
+  name: "lookup_order",
+  description: "Look up the shipping status of an order by its order ID.",
+  input_schema: {type: "object", properties: {order_id: {type: "string"}}, required: ["order_id"]},
+};
+
+async function runLoopLive(out){
+  const userMsg = document.getElementById('loop-input').value || "What is the status of order ORD-4471?";
+  out.clear();
+  out.log('> ' + userMsg, 'meta');
+  let messages = [{role: 'user', content: userMsg}];
+  try {
+    while (true){
+      out.log('… calling Claude');
+      const resp = await callClaude({messages, tools: [LOOKUP_TOOL_JS]});
+      messages.push({role: 'assistant', content: resp.content});
+      out.log('stop_reason = ' + JSON.stringify(resp.stop_reason), 'meta');
+      if (resp.stop_reason === 'end_turn'){
+        const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        out.log('');
+        out.log('✔ Final answer: ' + text, 'ok');
+        return;
+      }
+      if (resp.stop_reason === 'tool_use'){
+        const results = [];
+        for (const block of resp.content){
+          if (block.type !== 'tool_use') continue;
+          out.log('-> tool_use ' + block.name + '(' + JSON.stringify(block.input) + ')  id=' + block.id);
+          const result = ORDERS_JS[block.input.order_id] || {error: 'not found'};
+          results.push({type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result)});
+        }
+        messages.push({role: 'user', content: results});
+      }
+    }
+  } catch (e){
+    out.log('✗ ' + friendlyError(e), 'err');
+  }
+}
+
+const REVIEW_FILES_JS = {
+  "auth.py": "def check_login(user, pw):\n    if user.password == pw:  # plaintext comparison\n        return True\n",
+  "session.py": "def new_session(user):\n    token = str(random.randint(0, 999999))  # low-entropy\n",
+  "logout.py": "def logout(token):\n    pass  # sessions dict is never cleared\n",
+};
+
+async function runChainingLive(out){
+  out.clear();
+  out.log('--- Pass 1: per-file local analysis (one call per file) ---', 'meta');
+  try {
+    const findings = [];
+    for (const [filename, code] of Object.entries(REVIEW_FILES_JS)){
+      const resp = await callClaude({messages: [{role: 'user',
+        content: 'Review this file for security issues in one or two sentences.\n\n' + filename + ':\n' + code}]});
+      const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      findings.push(filename + ': ' + text);
+      out.log(filename + ': ' + text.slice(0, 160) + '...');
+    }
+    out.log('');
+    out.log('--- Pass 2: SEPARATE cross-file integration pass ---', 'meta');
+    const combined = Object.entries(REVIEW_FILES_JS).map(([f, c]) => f + ':\n' + c).join('\n\n');
+    const resp = await callClaude({messages: [{role: 'user',
+      content: 'Look ACROSS these files for issues only visible when considered together:\n\n' + combined}]});
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    out.log('✔ Cross-file finding: ' + text, 'ok');
+  } catch (e){
+    out.log('✗ ' + friendlyError(e), 'err');
+  }
+}
+
+async function runDynamicLive(out){
+  out.clear();
+  out.log('--- Dynamic decomposition: the model picks its own reading order ---', 'meta');
+  const READ_FILE_TOOL = {
+    name: 'read_file',
+    description: 'Read one file from the small codebase being audited.',
+    input_schema: {type: 'object',
+      properties: {filename: {type: 'string', enum: Object.keys(REVIEW_FILES_JS)}}, required: ['filename']},
+  };
+  let messages = [{role: 'user', content:
+    'Audit this codebase for security issues. Read whichever files you need, in whatever order ' +
+    'makes sense given what you find. Summarize when confident.'}];
+  try {
+    while (true){
+      const resp = await callClaude({messages, tools: [READ_FILE_TOOL]});
+      messages.push({role: 'assistant', content: resp.content});
+      if (resp.stop_reason === 'end_turn'){
+        const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        out.log('✔ Final summary: ' + text, 'ok');
+        return;
+      }
+      const results = [];
+      for (const block of resp.content){
+        if (block.type !== 'tool_use') continue;
+        const filename = block.input.filename;
+        out.log('-> model chose to read ' + JSON.stringify(filename) + ' next');
+        results.push({type: 'tool_result', tool_use_id: block.id, content: REVIEW_FILES_JS[filename]});
+      }
+      messages.push({role: 'user', content: results});
+    }
+  } catch (e){
+    out.log('✗ ' + friendlyError(e), 'err');
+  }
+}
+
+const SOURCES_JS = {
+  'src-1': 'A 2026 survey of 4,000 developers found AI code assistants cut time-to-first-PR by 35% for engineers with under 2 years of tenure.',
+  'src-2': 'Senior engineers (8+ years) reported only an 8% time reduction, and 20% reported net-negative productivity from review overhead.',
+};
+
+async function runCoordinatorLive(out){
+  out.clear();
+  out.log('Coordinator: spawning 2 subagents in PARALLEL (isolated context each)...', 'meta');
+  const angles = [
+    {id: 'A', prompt: 'You are a research subagent. Use ONLY this information: "' + SOURCES_JS['src-1'] + '" Summarize the finding in one sentence, tagged [src-1].'},
+    {id: 'B', prompt: 'You are a research subagent. Use ONLY this information: "' + SOURCES_JS['src-2'] + '" Summarize the finding in one sentence, tagged [src-2].'},
+  ];
+  try {
+    const t0 = performance.now();
+    const results = await Promise.all(angles.map(async a => {
+      const resp = await callClaude({messages: [{role: 'user', content: a.prompt}]});
+      const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+      out.log('✔ subagent ' + a.id + ' returned (' + Math.round(performance.now() - t0) + 'ms): ' + text, 'ok');
+      return text;
+    }));
+    out.log('All subagents done in ' + Math.round(performance.now() - t0) + 'ms — running sequentially would take roughly 2x as long.', 'meta');
+    out.log('Coordinator: synthesizing...', 'meta');
+    const synthPrompt = 'Combine these two findings into a short report. If they conflict, KEEP BOTH ' +
+      'and annotate the conflict — never arbitrarily pick one:\n\n' + results.join('\n\n');
+    const synthResp = await callClaude({messages: [{role: 'user', content: synthPrompt}]});
+    const synthText = synthResp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    out.log('');
+    out.log('✔ Final synthesized report:\n' + synthText, 'ok');
+  } catch (e){
+    out.log('✗ ' + friendlyError(e), 'err');
+  }
+}
+
+const CUSTOMERS_JS = {'Jordan Alvarez': {customer_id: 'CUST-9931', joined_unix: 1706745600}};
+const GET_CUSTOMER_TOOL_JS = {
+  name: 'get_customer', description: 'Look up a customer by name and verify their identity.',
+  input_schema: {type: 'object', properties: {customer_name: {type: 'string'}}, required: ['customer_name']},
+};
+const PROCESS_REFUND_TOOL_JS = {
+  name: 'process_refund', description: 'Refund an amount (USD) to a verified customer_id.',
+  input_schema: {type: 'object',
+    properties: {customer_id: {type: 'string'}, amount_usd: {type: 'number'}}, required: ['customer_id', 'amount_usd']},
+};
+
+async function runSupportAgentLive(userMsg, out, forceFirstCall){
+  out.clear();
+  out.log('> ' + userMsg, 'meta');
+  if (forceFirstCall){
+    out.log('(demo forces this first call via tool_choice, so the gate below fires deterministically --', 'meta');
+    out.log(' a well-behaved model would usually decline this request on its own, which is good, but does not', 'meta');
+    out.log(' prove the code-level gate exists. This isolates that.)', 'meta');
+  }
+  let verifiedCustomerId = null;
+  let messages = [{role: 'user', content: userMsg}];
+  let first = true;
+  try {
+    while (true){
+      const opts = {messages, tools: [GET_CUSTOMER_TOOL_JS, PROCESS_REFUND_TOOL_JS]};
+      if (first && forceFirstCall) opts.tool_choice = {type: 'tool', name: 'process_refund'};
+      first = false;
+      const resp = await callClaude(opts);
+      messages.push({role: 'assistant', content: resp.content});
+      if (resp.stop_reason === 'end_turn'){
+        const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+        out.log('');
+        out.log('✔ ' + text, 'ok');
+        return;
+      }
+      const results = [];
+      for (const block of resp.content){
+        if (block.type !== 'tool_use') continue;
+        if (block.name === 'get_customer'){
+          const rec = CUSTOMERS_JS[block.input.customer_name];
+          if (rec){
+            verifiedCustomerId = rec.customer_id;
+            const iso = new Date(rec.joined_unix * 1000).toISOString();
+            out.log('[hook: PostToolUse] normalized joined_unix -> ' + iso, 'meta');
+          }
+          results.push({type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(rec || {error: 'not found'})});
+        } else if (block.name === 'process_refund'){
+          out.log('-> tool_use process_refund(' + JSON.stringify(block.input) + ')');
+          if (!verifiedCustomerId){
+            out.log('[hook: PreToolUse] ✗ DENIED — no verified customer_id yet this session', 'err');
+            results.push({type: 'tool_result', tool_use_id: block.id, content: 'DENIED: verify the customer first.', is_error: true});
+          } else if (block.input.amount_usd > 500){
+            out.log('[hook: PreToolUse] ✗ DENIED — amount exceeds the $500 policy threshold, escalate to a human', 'err');
+            results.push({type: 'tool_result', tool_use_id: block.id, content: 'DENIED: exceeds policy threshold, escalate to a human.', is_error: true});
+          } else {
+            out.log('[hook: PreToolUse] ✔ allowed — verified id matches, amount within threshold', 'ok');
+            results.push({type: 'tool_result', tool_use_id: block.id,
+              content: 'Refunded $' + block.input.amount_usd + ' to ' + block.input.customer_id + '.'});
+          }
+        }
+      }
+      messages.push({role: 'user', content: results});
+    }
+  } catch (e){
+    out.log('✗ ' + friendlyError(e), 'err');
+  }
+}
+
+function attachLiveRunners(id){
+  if (id === 't11'){
+    document.getElementById('loop-run').onclick = runBtnGuard('loop-run', () => runLoopLive(liveConsole('loop-console')));
+  }
+  if (id === 't12'){
+    document.getElementById('coord-run').onclick = runBtnGuard('coord-run', () => runCoordinatorLive(liveConsole('coord-console')));
+  }
+  if (id === 't14'){
+    const out = () => liveConsole('hook-console');
+    document.getElementById('scenario-a').onclick = runBtnGuard('scenario-a', () =>
+      runSupportAgentLive('Refund $75 to customer_id CUST-9931.', out(), true));
+    document.getElementById('scenario-b').onclick = runBtnGuard('scenario-b', () =>
+      runSupportAgentLive('Jordan Alvarez wants a $75 refund. Verify their identity first, then refund.', out()));
+    document.getElementById('scenario-c').onclick = runBtnGuard('scenario-c', () =>
+      runSupportAgentLive('Jordan Alvarez wants a $650 refund. Verify their identity first, then refund.', out()));
+  }
+  if (id === 't16'){
+    document.getElementById('chain-run').onclick = runBtnGuard('chain-run', () => runChainingLive(liveConsole('decomp-console')));
+    document.getElementById('dynamic-run').onclick = runBtnGuard('dynamic-run', () => runDynamicLive(liveConsole('decomp-console')));
+  }
+}
+
+/* =========================================================================
+   INIT
+   ========================================================================= */
+loadApiState();
+loadProgress();
+showSection('overview');
+</script>
+</body>
+</html>

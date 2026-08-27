@@ -11,18 +11,38 @@ Nothing here reproduces exam questions. Everything is original: labs, scenarios,
 and practice questions written to prove out the *mechanism* behind each task
 statement, not to memorize an answer key.
 
+## Start here: `app.html`
+
+**[`app.html`](app.html)** is the front door — one page, open it directly in any
+browser (no server, no build step). It has everything: the concept for each task
+statement, a step-through visualization, **"Run live" buttons that call the real
+Claude API from your own browser using a key you paste into the page** (never
+written to a file, never sent anywhere but straight to Anthropic or your
+Anthropic-compatible endpoint), the actual lab source, and an integrated
+13-question practice quiz with scoring and progress tracking.
+
+Paste your key into the "Live API" panel in the sidebar to unlock the live demos.
+Nothing about that key is ever committed to this repo — it lives only in your
+browser tab.
+
+> If you're viewing this through a claude.ai Artifact preview link instead of the
+> actual file, the "Run live" buttons will not work there — claude.ai's sandbox
+> blocks outbound network calls by design. Open the real `app.html` file in a
+> normal browser to use them.
+
+The standalone pieces below still exist for anyone who wants to run the raw
+Python or read one file at a time.
+
 ## How to use this module
 
-1. Skim the task-statement table below so you know what you're aiming at.
-2. Run the labs in order — each prints a step-by-step trace of what's actually
-   happening, and most run live against a real Claude API call.
-3. Open [`visualize/agentic_loop.html`](visualize/agentic_loop.html) directly in
-   a browser (no server needed) to see the same mechanisms animated.
-4. Build both capstones in [`scenario.md`](scenario.md) — they're Anthropic's own
+1. Open `app.html`, skim the task-statement nav so you know what you're aiming at.
+2. Click "Run live" on each task statement to watch the real mechanism happen,
+   then read the code panel underneath to see the exact source.
+3. Build both capstones in [`scenario.md`](scenario.md) — they're Anthropic's own
    recommended prep exercises, done for real.
-5. Work [`practice-questions.md`](practice-questions.md) cold, then check your
-   reasoning against the explanations. Get one wrong? The question tells you
-   exactly which lab to go re-run.
+4. Work the practice quiz cold, then check your reasoning against the
+   explanations — each question names the lab that proves its answer.
+5. (Optional) Run the labs from the terminal too — see Setup below.
 
 ## Setup
 
