@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Domain 1 Study App</title>
+<title>CCAR-F Study App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -147,6 +147,16 @@
   .note-inline{background:var(--accentbg);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;
               padding:10px 14px;font-size:12.5px;line-height:1.55;margin:12px 0;}
 
+  .clicard{border:1px solid var(--accent);border-radius:12px;padding:18px 20px;margin-bottom:18px;
+           background:color-mix(in srgb, var(--accent) 6%, var(--card));}
+  .clicard .clihead{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .clicard .clihead .badge{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+      text-transform:uppercase;background:var(--accent);color:#fff;padding:2px 8px;border-radius:12px;}
+  .decision-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px;}
+  .decision-table th,.decision-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--hair);}
+  .decision-table th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;
+      text-transform:uppercase;color:var(--ink-soft);}
+
   /* code panel */
   .codebar{display:flex;align-items:center;justify-content:space-between;background:var(--c1);
            color:#fff;padding:9px 16px;border-radius:10px 10px 0 0;font-family:'IBM Plex Mono',monospace;
@@ -198,10 +208,9 @@
   <aside class="sidebar">
     <div class="brand">
       <div class="eyebrow">CCAR-F Study App</div>
-      <h1>Agentic Architecture<br>&amp; Orchestration</h1>
-      <div class="weight">Domain 1 · 27% of the exam</div>
+      <h1>All 5 Domains</h1>
+      <div class="weight">60 items · 720/1000 to pass · 12mo validity</div>
     </div>
-    <div class="navgroup-label">Task statements</div>
     <nav id="nav"></nav>
 
     <div class="navgroup-label">Live API</div>
@@ -244,14 +253,35 @@
    ========================================================================= */
 
 const SECTIONS = [
-  {id:'overview', num:'', label:'Overview'},
-  {id:'t11', num:'1.1', label:'Agentic Loop'},
-  {id:'t12', num:'1.2/1.3', label:'Coordinator & Subagents'},
-  {id:'t14', num:'1.4/1.5', label:'Enforcement & Hooks'},
-  {id:'t16', num:'1.6', label:'Decomposition'},
-  {id:'t17', num:'1.7', label:'Sessions & Forking'},
-  {id:'capstones', num:'', label:'Capstones'},
-  {id:'quiz', num:'', label:'Practice Quiz (13)'},
+  {id:'overview', num:'', label:'Overview', group:null},
+
+  {id:'t11', num:'1.1', label:'Agentic Loop', group:'Domain 1 · Agentic Architecture & Orchestration · 27%'},
+  {id:'t12', num:'1.2/1.3', label:'Coordinator & Subagents', group:'d1'},
+  {id:'t14', num:'1.4/1.5', label:'Enforcement & Hooks', group:'d1'},
+  {id:'t16', num:'1.6', label:'Decomposition', group:'d1'},
+  {id:'t17', num:'1.7', label:'Sessions & Forking', group:'d1'},
+  {id:'capstones', num:'', label:'Capstones', group:'d1'},
+
+  {id:'t21', num:'2.1', label:'Tool Descriptions', group:'Domain 2 · Tool Design & MCP Integration · 18%'},
+  {id:'t22', num:'2.2/2.3', label:'Errors & tool_choice', group:'d2'},
+  {id:'t24', num:'2.4/2.5', label:'MCP & Built-in Tools', group:'d2'},
+
+  {id:'t31', num:'3.1–3.3', label:'CLAUDE.md, Commands & Rules', group:'Domain 3 · Claude Code Configuration & Workflows · 20%'},
+  {id:'t34', num:'3.4', label:'Plan Mode vs Direct', group:'d3'},
+  {id:'t35', num:'3.5', label:'Iterative Refinement', group:'d3'},
+  {id:'t36', num:'3.6', label:'CI/CD Integration', group:'d3'},
+
+  {id:'t41', num:'4.1/4.2', label:'Precision & Few-shot', group:'Domain 4 · Prompt Engineering & Structured Output · 20%'},
+  {id:'t43', num:'4.3/4.4', label:'Structured Output', group:'d4'},
+  {id:'t45', num:'4.5', label:'Batch Processing', group:'d4'},
+  {id:'t46', num:'4.6', label:'Multi-Pass Review', group:'d4'},
+
+  {id:'t51', num:'5.1', label:'Context Management', group:'Domain 5 · Context Management & Reliability · 15%'},
+  {id:'t52', num:'5.2', label:'Escalation Patterns', group:'d5'},
+  {id:'t53', num:'5.3/5.4', label:'Error Propagation', group:'d5'},
+  {id:'t55', num:'5.5/5.6', label:'Review & Provenance', group:'d5'},
+
+  {id:'quiz', num:'', label:'Full Practice Exam', group:null},
 ];
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -798,6 +828,106 @@ const QUIZ = [
  {tag:'1.7', stem:'A developer wants to compare two fix strategies from one shared baseline analysis, without either polluting the other, and without redoing the baseline twice. Right mechanism?',
   opts:['Two separate sessions, each redoing the baseline from scratch','<code>fork_session</code> twice from the same baseline session, one per strategy','One session, asking about both strategies together','<code>--resume</code> twice in sequence in the same session'],
   correct:1, why:'Forking gives each branch the shared baseline for free while keeping explorations independent -- exactly the divergent-approaches use case.'},
+
+ {tag:'2.1', stem:'Tools <code>search_customer</code> ("Retrieves customer information") and <code>search_order</code> ("Retrieves order details") keep getting confused for order-status questions. Most effective first fix?',
+  opts:['Merge them into one tool that accepts any identifier','Expand each description with input formats, example queries, and explicit boundaries vs. the other tool','Add a routing classifier in front of both tools','Rename them to search_1 and search_2 to avoid bias'],
+  correct:1, why:'Descriptions are the primary signal the model uses to pick a tool. Minimal descriptions cause exactly this kind of misrouting -- the low-effort, high-leverage fix is making them specific.'},
+ {tag:'2.1', stem:'A tool called <code>process_data</code> handles validation, transformation, and storage via a "mode" parameter, and gets misused constantly. Best fix?',
+  opts:['Write a longer description covering all three modes in detail','Split it into three purpose-specific tools, each with a defined input/output contract','Add more few-shot examples showing correct mode selection','Restrict it to admin-only access'],
+  correct:1, why:'A generic multi-purpose tool is exactly the pattern the guide calls out for splitting into purpose-specific tools with clear contracts -- a better description on a fundamentally overloaded tool still leaves the ambiguity.'},
+
+ {tag:'2.2', stem:'An MCP tool returns the string "Operation failed" for every kind of failure -- timeout, bad input, or policy violation alike. What is the actual problem?',
+  opts:['The tool should retry automatically instead of failing','A uniform error string gives the agent no basis for deciding how to react','This is fine as long as isError is set to true','The model should infer the failure type from context'],
+  correct:1, why:'Structured error metadata (category, retryable, human-readable description) is what lets the agent react appropriately -- retry a transient failure, explain a business-rule denial, escalate a permission issue. A generic string collapses all of that.'},
+ {tag:'2.3', stem:'An agent has 18 tools available and increasingly picks the wrong one for routine tasks. Most effective first fix?',
+  opts:['Add a longer system prompt explaining when to use each tool','Scope the agent down to the 4-5 tools its role actually needs','Switch to a more capable model','Add few-shot examples for every tool'],
+  correct:1, why:'Too many tools increases decision complexity and degrades selection reliability on its own -- reducing the tool set is the structural fix; the other options add more for the model to reason through instead of less.'},
+ {tag:'2.3', stem:'You need to guarantee the model calls some tool rather than replying in plain text, but it is fine which one it picks from several relevant options. Which tool_choice?',
+  opts:['<code>{"type": "auto"}</code>','<code>{"type": "any"}</code>','<code>{"type": "tool", "name": "..."}</code>','Omit tool_choice entirely'],
+  correct:1, why:'"any" forces a tool call but leaves the choice of which tool to the model. "auto" allows skipping tools entirely; a named forced choice removes the model\'s choice altogether.'},
+
+ {tag:'2.4', stem:'A project-scoped MCP server needs an API token. Where does the token belong so the config can still be safely committed to the shared repo?',
+  opts:['Hardcoded directly in .mcp.json', 'Expanded from an environment variable, e.g. <code>${GITHUB_TOKEN}</code>, inside .mcp.json','In a comment at the top of .mcp.json','Base64-encoded inside .mcp.json'],
+  correct:1, why:'Environment variable expansion keeps the committed config free of secrets while still giving every teammate the same server definition.'},
+ {tag:'2.5', stem:'You need to find every call site of a specific error-handling function across a large, unfamiliar codebase. Which built-in tool is the right starting point?',
+  opts:['Glob, since it searches broadly','Grep, since it searches file contents for the function name','Read every file in the repo','Edit, to add logging at each guess'],
+  correct:1, why:'Grep searches content (function names, error strings, imports); Glob only matches file paths/names by pattern -- the wrong tool for a content search like this.'},
+ {tag:'2.5', stem:'An Edit call fails because its anchor text matches multiple places in the file. Correct fallback?',
+  opts:['Retry Edit with the exact same arguments','Read the full file, apply the change in memory, then Write the whole file back','Delete the file and recreate it from scratch','Switch to Bash with sed'],
+  correct:1, why:'Read + Write is the documented fallback when Edit\'s anchor text is not unique -- it operates on the whole file rather than requiring a unique match.'},
+
+ {tag:'3.1', stem:'A new teammate is not receiving the team\'s shared coding conventions that everyone else\'s Claude Code sessions follow. Most likely cause?',
+  opts:['They need to run /init','The conventions were placed in their personal <code>~/.claude/CLAUDE.md</code> instead of the project-level file','Claude Code has a per-user rollout delay','Their machine needs a restart'],
+  correct:1, why:'User-scope CLAUDE.md is personal and never shared via version control. Team-wide conventions have to live in the project-scoped file to reach every teammate automatically.'},
+ {tag:'3.1', stem:'A 600-line CLAUDE.md is mostly API conventions relevant only to <code>src/api/**</code>, and non-API sessions are paying the context cost anyway. Best fix?',
+  opts:['Wrap the API section in HTML comments','Move it into a <code>.claude/rules/</code> file with <code>paths: ["src/api/**"]</code>','Move it into an <code>@import</code>ed file','Delete it and rely on tribal knowledge'],
+  correct:1, why:'Path-scoped rules load only when a matching file is touched -- a real context reduction for non-API sessions. An @import still loads at launch regardless of scope; comments are stripped entirely, losing the content for API sessions too.'},
+ {tag:'3.2', stem:'A skill produces long, exploratory output you don\'t want polluting the main conversation\'s context. Which frontmatter option isolates it?',
+  opts:['<code>allowed-tools</code>','<code>argument-hint</code>','<code>context: fork</code>','<code>model: opus</code>'],
+  correct:2, why:'<code>context: fork</code> runs the skill in an isolated sub-agent context specifically so its verbose output doesn\'t pollute the main session.'},
+ {tag:'3.3', stem:'A testing convention needs to apply to every <code>*.test.tsx</code> file, which are scattered across many unrelated directories rather than one subtree. Best mechanism?',
+  opts:['A CLAUDE.md file placed in each directory containing test files','A single <code>.claude/rules/</code> file with a glob pattern like <code>paths: ["**/*.test.tsx"]</code>','One giant root CLAUDE.md covering every case','A skill invoked manually before writing each test'],
+  correct:1, why:'Glob-pattern rules apply by file type regardless of location -- exactly suited to conventions that don\'t follow the directory structure. Directory-level CLAUDE.md files can\'t easily cover files spread across many directories.'},
+ {tag:'3.4', stem:'A bug fix is a single added null-check in one function, with a stack trace pointing directly at the problem. Plan mode or direct execution?',
+  opts:['Plan mode -- always explore before changing code','Direct execution -- the scope is already completely clear','Plan mode, then direct execution for the actual fix','Neither -- ask the user to fix it manually'],
+  correct:1, why:'Plan mode earns its overhead on large-scale, multi-approach, architectural work. A single well-scoped fix with a clear cause doesn\'t need exploration first.'},
+ {tag:'3.5', stem:'A prose-described data transformation ("normalize the dates") produces inconsistent results across similar inputs. Most effective fix?',
+  opts:['Repeat the instruction more forcefully','Add 2-3 concrete input -> output examples pinning down the exact transformation','Lower the temperature','Break it into ten smaller prose instructions'],
+  correct:1, why:'Concrete examples communicate exactly what "normalize" means in a way prose descriptions -- however careful -- leave to interpretation.'},
+ {tag:'3.6', stem:'A CI script runs <code>claude "review this PR"</code> and the job hangs indefinitely. Fix?',
+  opts:['Add the <code>-p</code> (<code>--print</code>) flag for non-interactive mode','Set <code>CLAUDE_HEADLESS=true</code>','Add a <code>--batch</code> flag','Redirect stdin from /dev/null and hope for the best'],
+  correct:0, why:'<code>-p</code>/<code>--print</code> is the documented non-interactive flag. <code>CLAUDE_HEADLESS</code> and <code>--batch</code> are invented-sounding distractors that don\'t exist.'},
+ {tag:'3.6', stem:'A CI pipeline needs to post Claude\'s review findings as structured, machine-parseable PR comments. Which flag combination?',
+  opts:['<code>--verbose</code>','<code>--output-format json</code> (optionally with <code>--json-schema</code>)','<code>--print-json</code>','No flag needed -- default output is already structured'],
+  correct:1, why:'<code>--output-format json</code>, optionally paired with a schema, is what makes findings reliably parseable by the next pipeline step instead of freeform prose.'},
+
+ {tag:'4.1', stem:'"Be conservative, only report high-confidence findings" is not actually reducing a review pipeline\'s false-positive rate. Why, and what fixes it?',
+  opts:['The model needs a bigger context window','Confidence-based language doesn\'t define criteria the model can apply consistently -- replace it with explicit categorical rules (what to flag vs. skip, with examples)','Switch to a cheaper model','Increase max_tokens'],
+  correct:1, why:'Vague confidence instructions consistently fail to improve precision compared to specific, categorical criteria -- this is the guide\'s own headline point on the topic.'},
+ {tag:'4.2', stem:'A tool-selection prompt with one worked example handles that exact case perfectly but fails on a similar, slightly different case. Most likely issue?',
+  opts:['One example is memorized rather than generalized -- 2-4 examples showing the underlying reasoning generalize much better','The prompt needs to be much longer overall','The model needs a system prompt instead','Few-shot examples don\'t help with tool selection'],
+  correct:0, why:'A single example risks pattern-matching to that exact case. Multiple examples that show *why* a choice was made (not just the answer) let the model generalize the judgment to novel cases.'},
+
+ {tag:'4.3', stem:'A schema-enforced <code>tool_use</code> extraction returns syntactically perfect JSON where the line items don\'t actually sum to the stated total. What does this demonstrate?',
+  opts:['The schema is malformed','tool_use with a schema eliminates syntax errors, not semantic ones -- a validation step is still needed','This is impossible with tool_use','The model should have been forced with tool_choice instead'],
+  correct:1, why:'Schema-enforced structure guarantees the *shape* is valid JSON; it says nothing about whether the *values* are internally consistent. Semantic validation is a separate layer.'},
+ {tag:'4.3', stem:'An extraction schema marks <code>due_date</code> as a required field, but many source documents never state one. What\'s the risk, and the fix?',
+  opts:['No risk -- required fields are always filled correctly','The model may fabricate a plausible-looking date to satisfy the requirement -- make the field nullable instead','Required fields cause the API call to fail outright','Switch due_date to a string enum'],
+  correct:1, why:'A required field the model cannot honestly fill invites fabrication. Nullable (optional) fields let it truthfully return null when the source is silent.'},
+ {tag:'4.4', stem:'A validation-retry loop keeps failing on the same document because a required field genuinely never appears anywhere in the source text. Right response?',
+  opts:['Keep retrying with the same error message','Stop retrying -- retries fix format/structural mismatches, not information that was never in the source','Increase max_tokens and retry','Force tool_choice and retry'],
+  correct:1, why:'Retry-with-feedback works when the model misformatted something it could have gotten right. It cannot invent information that simply isn\'t in the document.'},
+ {tag:'4.5', stem:'A team wants to move both a blocking pre-merge check and a nightly technical-debt report to the Message Batches API for the 50% cost savings. Correct call?',
+  opts:['Move both -- savings are savings','Move only the nightly report; the pre-merge check has a developer waiting and batches have no latency SLA','Move neither, batches are only for training data','Move only the pre-merge check, since it runs more often'],
+  correct:1, why:'Batch processing trades latency guarantees for cost -- fine for non-blocking overnight work, wrong for a workflow where someone is actively waiting on the result.'},
+ {tag:'4.6', stem:'The same session that just wrote a function is asked to review its own code and reports "looks good." How do you get a genuinely independent check?',
+  opts:['Ask the same session to review it again, more carefully','Use a fresh call/session with no prior reasoning context to review the same code','Increase the temperature and re-ask','Add "be extra critical this time" to the prompt'],
+  correct:1, why:'A session that generated the code retains that reasoning and is biased toward defending it. An independent instance with no prior context reviews it without that bias.'},
+ {tag:'4.6', stem:'A single-pass review of a 14-file PR gives inconsistent depth per file and contradicts itself -- flagging a pattern as problematic in one file, approving identical code in another. Fix?',
+  opts:['Switch to a bigger-context model so it can see everything at once','Split into focused per-file passes plus a separate cross-file integration pass','Run the same single pass three times and vote','Ask the reviewer to be more consistent'],
+  correct:1, why:'This is attention dilution from processing too much at once. Per-file passes give each file focused attention; a separate integration pass still catches cross-file issues.'},
+
+ {tag:'5.1', stem:'An order-lookup tool returns 40+ fields when only 5 matter for a return request, and the agent\'s reasoning degrades over a long session. Root cause and fix?',
+  opts:['The model just needs a bigger context window','Verbose tool output is accumulating in context disproportionately to its relevance -- trim to the fields that actually matter before they pile up','This is unavoidable and just needs more careful prompting','Switch to a different tool entirely'],
+  correct:1, why:'Untrimmed verbose results consume context and dilute attention to what matters. Trimming at the point of ingestion, not after the fact, is the fix -- a bigger window delays the same problem rather than solving it.'},
+ {tag:'5.1', stem:'A fact stated on turn 3 of a 40-turn conversation gets misremembered by turn 35. Most reliable fix?',
+  opts:['Repeat the fact more emphatically when it\'s first stated','Extract it into a persistent "case facts" block re-included in every prompt, outside the summarized history','Increase max_tokens','Ask the model to try harder to remember'],
+  correct:1, why:'This is the "lost in the middle" effect -- a fact buried in a long history is unreliable. A persistent block that\'s always present, not just stated once, survives regardless of position.'},
+ {tag:'5.2', stem:'A customer lookup by name returns three matching records. Correct agent behavior?',
+  opts:['Pick the most recently active record','Ask the customer for a disambiguating identifier (email, order number, etc.)','Proceed with the first match returned','Escalate to a human immediately'],
+  correct:1, why:'Multiple matches call for asking for a disambiguating identifier, not a heuristic guess -- picking wrong here has real consequences (wrong account, wrong data).'},
+ {tag:'5.3', stem:'A subagent\'s tool call times out and it returns <code>{"status": "search unavailable"}</code> to the coordinator. What\'s the problem?',
+  opts:['Nothing -- the coordinator will figure it out','The generic status hides the failure type, what was attempted, and any partial results the coordinator needs to decide how to recover','The subagent should have crashed the whole pipeline instead','Timeouts should never be reported at all'],
+  correct:1, why:'A generic status gives the coordinator nothing to act on. Structured error context (failure type, attempted query, partial results) enables an actual recovery decision -- retry, try an alternative, or proceed with partial coverage.'},
+ {tag:'5.4', stem:'A long codebase-exploration session starts giving inconsistent answers, citing "typical patterns" instead of the specific classes it found earlier in the same session. Fix?',
+  opts:['Restart the session from scratch each time this happens','Maintain a scratchpad file recording key findings and reference it explicitly, rather than relying on it staying reliably in the model\'s active attention','Switch to a bigger context window','Ask more precise questions'],
+  correct:1, why:'This is context degradation over a long session. Externalizing key findings to a scratchpad file the agent re-reads counteracts it far more reliably than hoping a fact buried deep in history stays salient.'},
+ {tag:'5.5', stem:'A structured-extraction pipeline reports 97% aggregate accuracy. What\'s the risk of treating that number as sufficient on its own?',
+  opts:['None -- 97% is a strong result and needs no further analysis','Aggregate accuracy can mask far worse performance on a specific document type or field that needs targeted review','It means the pipeline is ready to fully replace human review everywhere','It implies the remaining 3% is randomly distributed and therefore low-risk'],
+  correct:1, why:'An aggregate number can hide a segment performing much worse. Accuracy needs to be checked by document type and field before assuming uniform reliability.'},
+ {tag:'5.6', stem:'Two credible sources report different figures for the same statistic, and one source is 2.5 years newer than the other. Best synthesis behavior?',
+  opts:['Average the two values','Use only the newer source and discard the older one','Keep both values, attribute each to its source and date, and note the newer figure may be a revision rather than a contradiction','Flag the entire report as unreliable and omit the statistic'],
+  correct:2, why:'Preserving both values with source and date attribution respects that a real temporal gap can explain an apparent conflict -- averaging or silently picking one discards information the reader needs to judge for themselves.'},
 ];
 
 /* =========================================================================
@@ -805,7 +935,21 @@ const QUIZ = [
    ========================================================================= */
 
 const nav = document.getElementById('nav');
+let lastGroupHeader = null;
 SECTIONS.forEach(s => {
+  if (s.group && s.group !== 'd1' && s.group !== 'd2' && s.group !== 'd3' && s.group !== 'd4' && s.group !== 'd5' && s.group !== lastGroupHeader){
+    const label = document.createElement('div');
+    label.className = 'navgroup-label';
+    label.style.marginTop = '10px';
+    label.textContent = s.group;
+    nav.appendChild(label);
+    lastGroupHeader = s.group;
+  } else if (s.group === null && s.id !== 'overview'){
+    const label = document.createElement('div');
+    label.className = 'navgroup-label';
+    label.style.marginTop = '10px';
+    nav.appendChild(label);
+  }
   const el = document.createElement('div');
   el.className = 'navitem';
   el.dataset.target = s.id;
@@ -840,6 +984,16 @@ function codePanelHTML(id, code, output, needsSetup){
 }
 
 /* ---------- Live-run panels (real fetch() calls to the Claude API) ---------- */
+
+function cliCardHTML(opts){
+  // opts: {title, body, code} -- for concepts that are Claude Code CLI /
+  // config surface, not a live API call (matches lab5_sessions.md's style).
+  return '<div class="clicard"><div class="clihead"><span class="badge">Try it yourself</span>'+
+    '<b>'+opts.title+'</b></div>'+
+    '<p style="font-size:13px;color:var(--ink-soft);margin:6px 0 0;">'+opts.body+'</p>'+
+    (opts.code ? '<pre class="code" style="margin-top:12px;max-height:none;">'+esc(opts.code)+'</pre>' : '')+
+    '</div>';
+}
 
 function liveRunHTML(opts){
   // opts: {id, title, body, controlsHTML, consoleId}
@@ -890,6 +1044,233 @@ function hookRunHTML(){
       '<button class="run" id="scenario-b">&#9654; Scenario B — verify, then refund</button>'+
       '<button class="run" id="scenario-c">&#9654; Scenario C — over the $500 threshold</button>',
     consoleId: 'hook-console',
+  });
+}
+
+/* ===================== Domain 2 live-run panels ===================== */
+
+const CODE_TOOLDESC = `# VAGUE -- both tools look nearly identical to the model
+bad_tools = [
+    {"name": "analyze_content", "description": "Analyzes content"},
+    {"name": "analyze_document", "description": "Analyzes a document"},
+]
+
+# SPECIFIC -- differentiated purpose, inputs, and boundaries
+good_tools = [
+    {
+        "name": "extract_web_results",
+        "description": "Extract structured data from a live web page given its URL. "
+                        "Use for pages you have NOT already downloaded. "
+                        "Do not use for local files -- see load_local_document.",
+        "input_schema": {"type": "object",
+            "properties": {"url": {"type": "string"}}, "required": ["url"]},
+    },
+    {
+        "name": "load_local_document",
+        "description": "Parse a document already saved to local disk (PDF, DOCX, TXT). "
+                        "Use for files the user uploaded or you already downloaded. "
+                        "Do not use for a URL -- see extract_web_results.",
+        "input_schema": {"type": "object",
+            "properties": {"file_path": {"type": "string"}}, "required": ["file_path"]},
+    },
+]`;
+
+function toolDescRunHTML(){
+  return liveRunHTML({
+    title: 'Same request, two tool-description qualities — live.',
+    body: 'Sends "Analyze https://example.com/report" to Claude twice: once with two nearly-identical vague tools, once with clearly differentiated ones. Watch which tool it picks each time.',
+    controlsHTML: '<button class="run" id="tooldesc-run">&#9654; Run live</button>',
+    consoleId: 'tooldesc-console',
+  });
+}
+
+const CODE_TOOLCHOICE = `# tool_choice: "auto" -- model may skip tools and just answer in text
+resp = call_claude(messages=msgs, tools=[weather_tool], tool_choice={"type": "auto"})
+
+# tool_choice: "any" -- model MUST call some tool, but picks which
+resp = call_claude(messages=msgs, tools=[weather_tool, time_tool], tool_choice={"type": "any"})
+
+# tool_choice: forced -- model MUST call this exact tool first
+resp = call_claude(messages=msgs, tools=[extract_tool, enrich_tool],
+                    tool_choice={"type": "tool", "name": "extract_tool"})`;
+
+function toolChoiceRunHTML(){
+  return liveRunHTML({
+    title: 'The same greeting-only message, three tool_choice modes — live.',
+    body: 'Sends "Hello!" (nothing tool-shaped about it) with a weather tool available under all three tool_choice modes, so you can see auto skip the tool while any/forced cannot.',
+    controlsHTML:
+      '<button class="run" id="tc-auto">&#9654; auto</button>'+
+      '<button class="run" id="tc-any">&#9654; any</button>'+
+      '<button class="run" id="tc-forced">&#9654; forced</button>',
+    consoleId: 'toolchoice-console',
+  });
+}
+
+/* ===================== Domain 3 ===================== */
+
+function decisionPickerHTML(){
+  const cases = [
+    {label: 'Add a single null-check to one function with a clear stack trace', answer: 'direct',
+     why: 'Well-understood, single-file, clear scope — plan mode would just add overhead.'},
+    {label: 'Restructure a monolith into microservices across 45+ files', answer: 'plan',
+     why: 'Large-scale, multiple valid approaches, architectural — exactly what plan mode is for.'},
+    {label: 'Migrate a library where two integration approaches have different infra requirements', answer: 'plan',
+     why: 'Multiple valid approaches with real tradeoffs need exploration before committing.'},
+    {label: 'Fix a typo in a docstring', answer: 'direct',
+     why: 'Trivially well-scoped — no exploration or design decision involved.'},
+  ];
+  let html = '<div class="card">';
+  cases.forEach((c, i) => {
+    html += '<div class="qcard" id="dp-'+i+'"><div class="qstem">'+c.label+'</div>'+
+      '<button class="opt" data-v="direct" onclick="pickDecision('+i+',\'direct\',\''+c.answer+'\')">Direct execution</button>'+
+      '<button class="opt" data-v="plan" onclick="pickDecision('+i+',\'plan\',\''+c.answer+'\')">Plan mode</button>'+
+      '<div class="explain" id="dpex-'+i+'"><b>Why:</b> '+c.why+'</div></div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function pickDecision(i, picked, correct){
+  const card = document.getElementById('dp-'+i);
+  if (card.dataset.answered) return;
+  card.dataset.answered = '1';
+  card.querySelectorAll('.opt').forEach(b => {
+    b.disabled = true;
+    if (b.dataset.v === correct) b.classList.add('correct');
+    else if (b.dataset.v === picked) b.classList.add('wrong');
+  });
+  document.getElementById('dpex-'+i).classList.add('shown');
+}
+
+const CODE_REFINEMENT = `# VAGUE -- "clean up the date formatting" means different things every time
+prompt_vague = "Normalize the dates in this dataset."
+
+# CONCRETE -- 2-3 input/output examples pin down the exact transformation
+prompt_concrete = """Normalize every date to YYYY-MM-DD. Examples:
+  "March 3rd, 2024"  ->  "2024-03-03"
+  "3/3/24"           ->  "2024-03-03"
+  "2024-03-03"       ->  "2024-03-03"  (already correct, leave as-is)
+
+Dataset:
+""" + dataset_text`;
+
+function refinementRunHTML(){
+  return liveRunHTML({
+    title: 'Vague instruction vs. concrete examples, same messy input — live.',
+    body: 'Both ask Claude to normalize the same three inconsistently-formatted dates. Compare the outputs.',
+    controlsHTML: '<button class="run" id="refine-run">&#9654; Run live</button>',
+    consoleId: 'refine-console',
+  });
+}
+
+/* ===================== Domain 4 ===================== */
+
+const CODE_PRECISION = `# VAGUE -- confidence-based instruction, does not define what "high confidence" means
+prompt_vague = "Review this code. Only flag high-confidence issues."
+
+# EXPLICIT -- categorical criteria the model can actually apply consistently
+prompt_explicit = """Review this code. Flag ONLY:
+- Security vulnerabilities (injection, auth bypass, secrets in code)
+- Bugs that cause incorrect output for valid input
+Do NOT flag: style preferences, naming, or anything that already matches
+a pattern used elsewhere in this file."""`;
+
+function precisionRunHTML(){
+  return liveRunHTML({
+    title: 'Vague vs. explicit review criteria, same code snippet — live.',
+    body: 'Reviews a snippet with one real bug and several stylistic quirks. Watch whether "be conservative" filters noise as well as an explicit allow/skip list.',
+    controlsHTML: '<button class="run" id="precision-run">&#9654; Run live</button>',
+    consoleId: 'precision-console',
+  });
+}
+
+const CODE_STRUCTURED = `extract_invoice_tool = {
+    "name": "extract_invoice",
+    "description": "Extract structured invoice data.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "vendor": {"type": "string"},
+            "total_usd": {"type": "number"},
+            "due_date": {"type": ["string", "null"], "description": "ISO date, or null if not stated"},
+            "line_items": {"type": "array", "items": {"type": "object",
+                "properties": {"desc": {"type": "string"}, "amount_usd": {"type": "number"}}}},
+        },
+        "required": ["vendor", "total_usd", "line_items"],  # due_date NOT required -- nullable, prevents fabrication
+    },
+}
+
+resp = call_claude(messages=[...], tools=[extract_invoice_tool],
+                    tool_choice={"type": "tool", "name": "extract_invoice"})
+extracted = resp.content[0].input  # guaranteed schema-valid JSON -- but check calculated_total vs stated_total`;
+
+function structuredRunHTML(){
+  return liveRunHTML({
+    title: 'Forced JSON-schema extraction from a messy invoice — live.',
+    body: 'Extracts structured fields from an invoice description with a missing due date, proving the nullable field returns null instead of a fabricated date.',
+    controlsHTML: '<button class="run" id="structured-run">&#9654; Run live</button>',
+    consoleId: 'structured-console',
+  });
+}
+
+const CODE_REVIEW = `# SELF-REVIEW -- same conversation, retains its own prior reasoning
+messages.append({"role": "user", "content": "Now review the code you just wrote for bugs."})
+self_review = call_claude(messages=messages)
+
+# INDEPENDENT REVIEW -- fresh call, zero prior reasoning to defend
+independent_review = call_claude(messages=[
+    {"role": "user", "content": f"Review this code for bugs, with no context on how it was written:\\n\\n{code}"}
+])`;
+
+function reviewRunHTML(){
+  return liveRunHTML({
+    title: 'Self-review vs. an independent fresh instance, same buggy code — live.',
+    body: 'Generates a small function with one subtle off-by-one bug, then asks the SAME conversation to review its own work, and asks a FRESH call with no prior context to review it independently.',
+    controlsHTML: '<button class="run" id="review-run">&#9654; Run live</button>',
+    consoleId: 'review-console',
+  });
+}
+
+/* ===================== Domain 5 ===================== */
+
+const CODE_ESCALATION = `ESCALATE_TOOL = {
+    "name": "escalate_to_human",
+    "description": "Hand off to a human agent with a structured summary. "
+                    "Use for: explicit customer request for a human, a policy gap "
+                    "(the request isn't covered by any rule you have), or no progress "
+                    "after reasonable effort. Do NOT use for: mere complexity, negative "
+                    "sentiment alone, or low self-reported confidence.",
+    "input_schema": {"type": "object", "properties": {
+        "reason": {"type": "string"}, "summary": {"type": "string"}}},
+}`;
+
+function escalationRunHTML(){
+  return liveRunHTML({
+    title: 'Three requests, three different right answers — live.',
+    body: 'Tests whether the agent escalates on the right trigger: an explicit ask for a human, a genuine policy gap, and a merely annoyed-but-solvable customer (should NOT escalate).',
+    controlsHTML:
+      '<button class="run" id="esc-explicit">&#9654; Explicit request</button>'+
+      '<button class="run" id="esc-gap">&#9654; Policy gap</button>'+
+      '<button class="run" id="esc-frustrated">&#9654; Just frustrated</button>',
+    consoleId: 'escalation-console',
+  });
+}
+
+const CODE_PROVENANCE = `synthesis_prompt = """Combine these findings. If sources conflict, KEEP BOTH values
+and annotate the conflict with both source ids and dates -- never silently pick one.
+
+- src-1 (published 2024-01): "Global XR market reached $28B in 2023."
+- src-2 (published 2026-06): "Global XR market reached $41B in 2023."
+"""
+# A good synthesis notices src-2 is 2.5 years newer -- likely a revised estimate,
+# not necessarily a contradiction -- and says so explicitly.`;
+
+function provenanceRunHTML(){
+  return liveRunHTML({
+    title: 'Two sources, one contested number, different publication dates — live.',
+    body: 'Feeds the synthesis two genuinely conflicting statistics with different publish dates, and checks whether the output preserves both with attribution instead of averaging or picking one.',
+    controlsHTML: '<button class="run" id="provenance-run">&#9654; Run live</button>',
+    consoleId: 'provenance-console',
   });
 }
 
@@ -960,23 +1341,26 @@ function updateQuizSummary(){
    ========================================================================= */
 
 function renderOverview(){
-  return '<h2>Domain 1 — Agentic Architecture &amp; Orchestration</h2>'+
-  '<p class="dek">27% of the CCAR-F exam — the single largest domain. This app is built directly '+
-  'from Anthropic\'s own Exam Guide: 7 task statements, each with a working lab, an interactive '+
-  'walkthrough, and questions in the exam\'s applied-scenario register.</p>'+
-  '<div class="card"><h3 style="margin-top:0">The 7 task statements</h3><ul style="line-height:2;font-size:14px;padding-left:20px;">'+
-  '<li><b>1.1</b> Design and implement agentic loops for autonomous task execution</li>'+
-  '<li><b>1.2</b> Orchestrate multi-agent systems with coordinator-subagent patterns</li>'+
-  '<li><b>1.3</b> Configure subagent invocation, context passing, and spawning</li>'+
-  '<li><b>1.4</b> Implement multi-step workflows with enforcement and handoff patterns</li>'+
-  '<li><b>1.5</b> Apply Agent SDK hooks for tool call interception and data normalization</li>'+
-  '<li><b>1.6</b> Design task decomposition strategies for complex workflows</li>'+
-  '<li><b>1.7</b> Manage session state, resumption, and forking</li></ul></div>'+
+  return '<h2>CCAR-F, all 5 domains, one app</h2>'+
+  '<p class="dek">Built directly from Anthropic\'s own Exam Guide (v1.0, July 2026) — 30 task statements '+
+  'across 5 domains, each with a concept explainer in the exam\'s own vocabulary, an interactive walkthrough, '+
+  'a "Run it for real" live demo you drive yourself with your own API key, and original scenario-style '+
+  'practice questions. '+QUIZ.length+' questions total, plus a combined full-exam quiz at the end.</p>'+
+  '<div class="card"><h3 style="margin-top:0">The 5 domains</h3><table class="decision-table">'+
+  '<tr><th>#</th><th>Domain</th><th>Weight</th></tr>'+
+  '<tr><td>1</td><td>Agentic Architecture &amp; Orchestration</td><td>27%</td></tr>'+
+  '<tr><td>2</td><td>Tool Design &amp; MCP Integration</td><td>18%</td></tr>'+
+  '<tr><td>3</td><td>Claude Code Configuration &amp; Workflows</td><td>20%</td></tr>'+
+  '<tr><td>4</td><td>Prompt Engineering &amp; Structured Output</td><td>20%</td></tr>'+
+  '<tr><td>5</td><td>Context Management &amp; Reliability</td><td>15%</td></tr>'+
+  '</table></div>'+
   '<div class="card"><h3 style="margin-top:0">How to use this</h3><p style="font-size:14px;line-height:1.7;margin:0;">'+
-  'Go section by section down the left sidebar. Each one has: the concept in exam-relevant terms, an '+
-  'interactive step-through of the mechanism, the actual lab code (two labs verified live against a '+
-  'real Claude API call — you can see the real output), and questions in that section\'s exact style. '+
-  'Finish with the full 13-question quiz — it tells you exactly which task statements to revisit.</p></div>';
+  'Set up your key in the "Live API" panel first (sidebar). Then go domain by domain: read the concept, watch '+
+  'the step-through, click "Run it for real" and watch the actual mechanism happen against a live model call, '+
+  'then check the code panel to see exactly how. Each page ends with questions in that task statement\'s exact '+
+  'register. Finish with the Full Practice Exam — it scores you and names exactly which task statements to revisit.</p></div>'+
+  '<div class="note-inline"><b>Two capstones</b> in Domain 1 are original walkthroughs of exercises Anthropic\'s '+
+  'own guide tells candidates to build before sitting the exam — see the Capstones page.</div>';
 }
 
 function renderT11(){
@@ -1133,17 +1517,300 @@ function renderCapstones(){
   '</ul></div>';
 }
 
+/* ===================== DOMAIN 2 — Tool Design & MCP Integration ===================== */
+
+function renderT21(){
+  return '<div class="taghead"><span class="pill">Task 2.1</span></div>'+
+  '<h2>Design effective tool interfaces</h2>'+
+  '<p class="dek">Tool descriptions are the primary mechanism the model uses to pick the right tool. Minimal '+
+  'descriptions cause misrouting between similar tools — the fix is almost always a better description, not '+
+  'more infrastructure.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Minimal descriptions lead to unreliable selection among similar tools</li>'+
+  '<li>Descriptions should include input formats, example queries, edge cases, and boundaries vs. similar tools</li>'+
+  '<li>System-prompt wording can create unintended keyword-based tool associations that override good descriptions</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Write descriptions that differentiate purpose, inputs, outputs, and when to use this tool vs. alternatives</li>'+
+  '<li>Rename tools and rewrite descriptions to eliminate functional overlap</li>'+
+  '<li>Split an overly generic tool into purpose-specific tools with defined contracts</li></ul></div>'+
+  '<h3>Run it for real</h3>'+toolDescRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('tool-descriptions', CODE_TOOLDESC, null, false)+'</div>'+
+  quizMini('2.1');
+}
+
+function renderT22(){
+  return '<div class="taghead"><span class="pill">Tasks 2.2 &amp; 2.3</span></div>'+
+  '<h2>Structured errors &amp; tool_choice</h2>'+
+  '<p class="dek">Generic "operation failed" errors give the model nothing to act on. And <code>tool_choice</code> '+
+  'is how you control whether the model can skip tools entirely, must call some tool, or must call one specific tool.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>The MCP <code>isError</code> flag pattern for signaling tool failure back to the agent</li>'+
+  '<li>Transient (timeout) vs. validation (bad input) vs. business (policy) vs. permission errors — each needs a different reaction</li>'+
+  '<li><code>tool_choice</code>: <code>"auto"</code> (may skip), <code>"any"</code> (must call some tool), <code>{"type":"tool","name":"..."}</code> (must call that one)</li>'+
+  '<li>Too many tools (18 instead of 4–5) degrades selection reliability by increasing decision complexity</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Return <code>errorCategory</code>, <code>isRetryable</code>, and a human-readable description — not a generic string</li>'+
+  '<li>Distinguish access failures (retry-worthy) from valid empty results (successful query, no matches)</li>'+
+  '<li>Force a specific tool with <code>tool_choice</code> to guarantee a step runs before others</li>'+
+  '<li>Scope each agent to the 4–5 tools its role actually needs</li></ul></div>'+
+  '<h3>Run it for real</h3>'+toolChoiceRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('tool-choice', CODE_TOOLCHOICE, null, false)+'</div>'+
+  quizMini('2.2')+quizMini('2.3');
+}
+
+function renderT24(){
+  return '<div class="taghead"><span class="pill">Tasks 2.4 &amp; 2.5</span></div>'+
+  '<h2>MCP servers &amp; built-in tools</h2>'+
+  '<p class="dek">MCP server scope (project vs. personal), credential handling via env vars, and picking the '+
+  'right built-in tool for the job.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Project-scope MCP servers live in <code>.mcp.json</code> (shared, checked into the repo); personal/experimental ones go in <code>~/.claude.json</code></li>'+
+  '<li>Environment variable expansion (e.g. <code>${GITHUB_TOKEN}</code>) keeps credentials out of the committed config</li>'+
+  '<li>MCP <b>resources</b> expose content catalogs (docs, schemas) to cut down on exploratory tool calls; MCP <b>tools</b> are for actions</li>'+
+  '<li><code>Grep</code> = content search, <code>Glob</code> = filename pattern search, <code>Edit</code> needs unique anchor text (fall back to Read+Write when it isn\'t unique)</li></ul></div>'+
+  '<h3>Try it yourself</h3>'+cliCardHTML({
+    title: 'A project-scoped .mcp.json with credential expansion',
+    body: 'Checked into the repo so the whole team gets the same MCP servers — the token itself never is.',
+    code: `{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "\${GITHUB_TOKEN}" }
+    }
+  }
+}`,
+  })+
+  '<div class="note-inline"><b>Exam trap:</b> preferring a custom-built MCP server over an existing community one '+
+  '(e.g. for Jira, GitHub) for a standard integration is over-engineering — reserve custom servers for genuinely '+
+  'team-specific workflows.</div>'+
+  quizMini('2.4')+quizMini('2.5');
+}
+
+/* ===================== DOMAIN 3 — Claude Code Configuration & Workflows ===================== */
+
+function renderT31(){
+  return '<div class="taghead"><span class="pill">Tasks 3.1–3.3</span></div>'+
+  '<h2>CLAUDE.md, commands, skills &amp; rules</h2>'+
+  '<p class="dek">Four ways to shape Claude Code\'s behavior, each with a different load-time and scope — '+
+  'picking the wrong one either bloats every session\'s context or fails to reach the people who need it.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Hierarchy: user (<code>~/.claude/CLAUDE.md</code>, personal — never shared via version control) → project (<code>.claude/CLAUDE.md</code> or root, shared) → directory-level</li>'+
+  '<li><code>@import</code> keeps CLAUDE.md modular; <code>.claude/rules/</code> files load conditionally via YAML <code>paths:</code> glob frontmatter</li>'+
+  '<li>Commands: <code>.claude/commands/</code> (shared) vs. <code>~/.claude/commands/</code> (personal)</li>'+
+  '<li>Skills add <code>context: fork</code> (isolate verbose output), <code>allowed-tools</code>, <code>argument-hint</code> frontmatter</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Diagnose "a new teammate isn\'t getting the instruction" as a user-scope-vs-project-scope bug</li>'+
+  '<li>Split a 600-line CLAUDE.md into path-scoped rules so non-matching sessions never load them</li>'+
+  '<li>Use <code>context: fork</code> for a skill that produces verbose exploratory output</li></ul></div>'+
+  '<h3>Try it yourself</h3>'+cliCardHTML({
+    title: 'A path-scoped rule that only loads for API files',
+    body: 'Lives in .claude/rules/api-conventions.md — Claude Code loads it only when it actually touches a matching file, not at every session start.',
+    code: `---
+paths: ["src/api/**/*.ts"]
+---
+
+# API conventions
+- Every handler validates its input with zod before touching the DB
+- Return errors as { code, message }, never a bare string`,
+  })+
+  quizMini('3.1')+quizMini('3.2')+quizMini('3.3');
+}
+
+function renderT34(){
+  return '<div class="taghead"><span class="pill">Task 3.4</span></div>'+
+  '<h2>Plan mode vs. direct execution</h2>'+
+  '<p class="dek">The core judgment call: does this task need safe exploration and a reviewable plan before '+
+  'anything changes, or is the scope already completely clear?</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Plan mode: large-scale changes, multiple valid approaches, architectural decisions, multi-file work</li>'+
+  '<li>Direct execution: simple, well-scoped changes with a clear fix (a stack trace pointing at one function)</li>'+
+  '<li>The <b>Explore</b> subagent isolates verbose discovery output during multi-phase plan-mode work so it doesn\'t exhaust the main conversation\'s context</li></ul></div>'+
+  '<h3>Pick one</h3>'+decisionPickerHTML()+
+  quizMini('3.4');
+}
+
+function renderT35(){
+  return '<div class="taghead"><span class="pill">Task 3.5</span></div>'+
+  '<h2>Iterative refinement</h2>'+
+  '<p class="dek">When a prose description of what you want produces inconsistent results, concrete input/output '+
+  'examples fix it faster than a longer, more careful-sounding description ever will.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Concrete input/output examples communicate intent more reliably than prose when descriptions are interpreted inconsistently</li>'+
+  '<li>Test-driven iteration: write the test suite first, iterate by sharing failures</li>'+
+  '<li>The "interview pattern": have Claude ask clarifying questions before implementing in an unfamiliar domain</li>'+
+  '<li>Interacting issues → one detailed message; independent issues → sequential iteration</li></ul></div>'+
+  '<h3>Run it for real</h3>'+refinementRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('iterative-refinement', CODE_REFINEMENT, null, false)+'</div>'+
+  quizMini('3.5');
+}
+
+function renderT36(){
+  return '<div class="taghead"><span class="pill">Task 3.6</span></div>'+
+  '<h2>CI/CD integration</h2>'+
+  '<p class="dek">Running Claude Code unattended in a pipeline needs three things: a way to stop it waiting for '+
+  'input, machine-parseable output, and awareness of what a prior run already flagged.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li><code>-p</code> / <code>--print</code>: non-interactive mode — the documented way to avoid a hung pipeline. There is no <code>CLAUDE_HEADLESS</code> env var or <code>--batch</code> flag; those are invented-sounding distractors</li>'+
+  '<li><code>--output-format json</code> + <code>--json-schema</code>: structured, parseable findings for posting inline PR comments</li>'+
+  '<li>A fresh review instance catches more than the same session reviewing its own generated code</li></ul></div>'+
+  '<h3>Try it yourself</h3>'+cliCardHTML({
+    title: 'A CI-safe, structured review invocation',
+    body: 'The -p flag prevents an interactive-input hang; --output-format json makes the findings parseable by the next pipeline step.',
+    code: `claude -p "Review this PR diff for security issues. \\
+Report only NEW issues -- here are prior findings already addressed: \\
+$(cat .claude-prior-findings.json)" \\
+  --output-format json \\
+  < pr.diff > findings.json`,
+  })+
+  quizMini('3.6');
+}
+
+/* ===================== DOMAIN 4 — Prompt Engineering & Structured Output ===================== */
+
+function renderT41(){
+  return '<div class="taghead"><span class="pill">Tasks 4.1 &amp; 4.2</span></div>'+
+  '<h2>Explicit criteria &amp; few-shot prompting</h2>'+
+  '<p class="dek">"Be conservative" and "only report high-confidence findings" do not improve precision — '+
+  'specific, categorical criteria do. And few-shot examples fix ambiguous-case handling that prose can\'t pin down.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Vague confidence-based instructions fail to improve precision compared to explicit categorical criteria</li>'+
+  '<li>High false-positive categories erode trust in the accurate ones — sometimes the right fix is disabling a category, not tuning it further</li>'+
+  '<li>2–4 few-shot examples generalize judgment to novel patterns, not just the cases shown</li></ul></div>'+
+  '<h3>Run it for real</h3>'+precisionRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('precision-criteria', CODE_PRECISION, null, false)+'</div>'+
+  quizMini('4.1')+quizMini('4.2');
+}
+
+function renderT43(){
+  return '<div class="taghead"><span class="pill">Tasks 4.3 &amp; 4.4</span></div>'+
+  '<h2>Structured output &amp; validation loops</h2>'+
+  '<p class="dek"><code>tool_use</code> with a JSON schema eliminates syntax errors — it does not eliminate '+
+  'semantic ones. That gap is what validation-retry loops are for.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Tool use with a JSON schema is the most reliable way to get guaranteed schema-compliant output</li>'+
+  '<li>It does not catch semantic errors: line items that don\'t sum to the total, values in the wrong field</li>'+
+  '<li>Nullable fields prevent the model from fabricating a value just to satisfy a required field</li>'+
+  '<li>Retry-with-error-feedback works for format/structural mismatches; it does not work when the needed information simply isn\'t in the source</li></ul></div>'+
+  '<h3>Run it for real</h3>'+structuredRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('structured-output', CODE_STRUCTURED, null, false)+'</div>'+
+  quizMini('4.3')+quizMini('4.4');
+}
+
+function renderT45(){
+  return '<div class="taghead"><span class="pill">Task 4.5</span></div>'+
+  '<h2>Batch processing</h2>'+
+  '<p class="dek">50% cheaper, up to 24 hours to complete, no multi-turn tool calling inside a single request. '+
+  'Match the API to the workflow\'s actual latency tolerance.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Message Batches API: 50% cost savings, up to 24h processing window, no guaranteed latency SLA</li>'+
+  '<li>Appropriate for non-blocking work (overnight reports); wrong for blocking workflows (pre-merge checks)</li>'+
+  '<li><code>custom_id</code> correlates request/response pairs and lets you resubmit only the failures</li></ul></div>'+
+  '<h3>Match the API to the workflow</h3>'+
+  '<div class="card"><table class="decision-table"><tr><th>Workflow</th><th>Someone waiting?</th><th>API</th></tr>'+
+  '<tr><td>Pre-merge check blocking a developer</td><td>Yes</td><td>Synchronous (real-time)</td></tr>'+
+  '<tr><td>Nightly technical-debt report</td><td>No</td><td>Batch (50% cheaper)</td></tr>'+
+  '<tr><td>Weekly audit across 10,000 documents</td><td>No</td><td>Batch</td></tr>'+
+  '<tr><td>Live chat support agent</td><td>Yes</td><td>Synchronous</td></tr></table></div>'+
+  quizMini('4.5');
+}
+
+function renderT46(){
+  return '<div class="taghead"><span class="pill">Task 4.6</span></div>'+
+  '<h2>Multi-instance &amp; multi-pass review</h2>'+
+  '<p class="dek">A model that just generated code retains that reasoning and is less likely to question its '+
+  'own decisions in the same session. A fresh instance, with no prior reasoning to defend, catches more.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Self-review limitations: the generating session is biased toward its own prior reasoning</li>'+
+  '<li>Independent review instances catch subtler issues than self-review instructions or extended thinking alone</li>'+
+  '<li>Splitting a large review into per-file passes plus a separate integration pass avoids attention dilution and contradictory findings</li></ul></div>'+
+  '<h3>Run it for real</h3>'+reviewRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('multi-pass-review', CODE_REVIEW, null, false)+'</div>'+
+  quizMini('4.6');
+}
+
+/* ===================== DOMAIN 5 — Context Management & Reliability ===================== */
+
+function renderT51(){
+  return '<div class="taghead"><span class="pill">Task 5.1</span></div>'+
+  '<h2>Managing context across long interactions</h2>'+
+  '<p class="dek">A raw order lookup can carry 40+ fields when 5 are relevant. Left untrimmed, that noise '+
+  'accumulates and dilutes the model\'s attention to what actually matters.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Progressive summarization risks collapsing exact numbers, dates, and stated expectations into vague prose</li>'+
+  '<li>"Lost in the middle": models reliably attend to the start and end of long inputs, less reliably to the middle</li>'+
+  '<li>Verbose tool results consume context disproportionately to their relevance</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Extract transactional facts into a persistent "case facts" block carried in every prompt, outside the summarized history</li>'+
+  '<li>Trim tool output to only the fields that are actually relevant before they accumulate</li>'+
+  '<li>Put key findings at the start of aggregated input, with explicit section headers for the rest</li></ul></div>'+
+  '<h3>See it step by step</h3>'+stepperHTML('ctx')+
+  quizMini('5.1');
+}
+
+function renderT52(){
+  return '<div class="taghead"><span class="pill">Task 5.2</span></div>'+
+  '<h2>Escalation &amp; ambiguity resolution</h2>'+
+  '<p class="dek">Right triggers: an explicit request for a human, a genuine policy gap, inability to make '+
+  'progress. Sentiment and self-reported confidence are not proxies for actual case complexity.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Honor an explicit "let me talk to a human" request immediately — don\'t investigate first</li>'+
+  '<li>Escalate on a genuine policy gap (the request isn\'t covered by any rule), not just on perceived complexity</li>'+
+  '<li>Sentiment-based and self-reported-confidence escalation are unreliable proxies for actual complexity</li>'+
+  '<li>Multiple matching records → ask for a disambiguating identifier, never pick heuristically</li></ul></div>'+
+  '<h3>Run it for real</h3>'+escalationRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('escalation', CODE_ESCALATION, null, false)+'</div>'+
+  quizMini('5.2');
+}
+
+function renderT53(){
+  return '<div class="taghead"><span class="pill">Tasks 5.3 &amp; 5.4</span></div>'+
+  '<h2>Error propagation &amp; codebase exploration</h2>'+
+  '<p class="dek">A generic "search unavailable" status hides exactly the information a coordinator needs to '+
+  'recover intelligently. And long exploration sessions need externalized memory, not a bigger context window.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Structured error context (failure type, what was attempted, partial results) enables real coordinator recovery decisions</li>'+
+  '<li>Access failures (needing a retry decision) are different from valid empty results (a successful query, no matches) — conflating them is a real anti-pattern</li>'+
+  '<li>Silently suppressing an error (empty result marked success) and aborting the whole workflow on one failure are both anti-patterns</li>'+
+  '<li>Scratchpad files persist key findings across context boundaries during long exploration; structured state manifests enable crash recovery</li></ul></div>'+
+  '<div class="note-inline"><b>Exam trap:</b> a coordinator that terminates an entire multi-agent workflow because '+
+  'one subagent failed is treated the same as silently suppressing the error — both throw away recoverable work. '+
+  'The correct pattern is local recovery where possible, structured propagation of what can\'t be resolved locally.</div>'+
+  quizMini('5.3')+quizMini('5.4');
+}
+
+function renderT55(){
+  return '<div class="taghead"><span class="pill">Tasks 5.5 &amp; 5.6</span></div>'+
+  '<h2>Human review, confidence &amp; provenance</h2>'+
+  '<p class="dek">97% aggregate accuracy can hide a document type or field that performs far worse. And when two '+
+  'credible sources disagree, the fix is annotating the conflict — never silently picking one.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Aggregate accuracy metrics can mask poor performance on specific document types or fields</li>'+
+  '<li>Field-level confidence scores, calibrated against a labeled validation set, route review attention where it\'s needed</li>'+
+  '<li>Source attribution is lost when findings get compressed without preserving claim-source mappings</li>'+
+  '<li>Publication/collection dates in structured output prevent a real temporal difference from being misread as a contradiction</li></ul></div>'+
+  '<h3>Run it for real</h3>'+provenanceRunHTML()+
+  '<h3>The code</h3><div class="card">'+codePanelHTML('provenance', CODE_PROVENANCE, null, false)+'</div>'+
+  quizMini('5.5')+quizMini('5.6');
+}
+
 function renderQuiz(){
-  let html = '<h2>Practice Quiz</h2><p class="dek">13 original, scenario-style questions across all 7 task '+
-  'statements. Answer them cold — the summary at the top tells you exactly which task statements to revisit.</p>'+
-  '<div class="quiz-summary" id="quiz-summary"><div class="detail">Answer all 13 to see your score.</div></div>';
+  let html = '<h2>Full Practice Exam</h2><p class="dek">' + QUIZ.length + ' original, scenario-style questions '+
+  'across all 5 domains, weighted roughly the way the real blueprint weights them. Answer them cold — the '+
+  'summary at the top tells you exactly which task statements to revisit.</p>'+
+  '<div class="quiz-summary" id="quiz-summary"><div class="detail">Answer all ' + QUIZ.length + ' to see your score.</div></div>';
   QUIZ.forEach((q,i) => { html += quizCardHTML(q, 'full-'+i); });
   return html;
 }
 
 const RENDERERS = {
   overview: renderOverview, t11: renderT11, t12: renderT12, t14: renderT14,
-  t16: renderT16, t17: renderT17, capstones: renderCapstones, quiz: renderQuiz,
+  t16: renderT16, t17: renderT17, capstones: renderCapstones,
+  t21: renderT21, t22: renderT22, t24: renderT24,
+  t31: renderT31, t34: renderT34, t35: renderT35, t36: renderT36,
+  t41: renderT41, t43: renderT43, t45: renderT45, t46: renderT46,
+  t51: renderT51, t52: renderT52, t53: renderT53, t55: renderT55,
+  quiz: renderQuiz,
 };
 
 /* =========================================================================
@@ -1270,12 +1937,20 @@ const STEPS_SESS = [
  {caption:'Comparing two fixes: fork, don\'t duplicate', html:'<div class="row"><div class="node good"><div class="node-title">--fork-session "fix-secrets"</div><div class="node-body">Shares the baseline analysis for free.</div></div><div class="node good"><div class="node-title">--fork-session "fix-jwt"</div><div class="node-body">Independent — doesn\'t see the other branch\'s reasoning.</div></div></div>'},
 ];
 
+const STEPS_CTX = [
+ {caption:'A raw tool result: 40+ fields, 5 relevant', html:'<div class="node bad"><div class="node-title">Untrimmed order lookup</div><div class="node-body">order_id, sku, warehouse_zone, carrier_contract_id, packaging_type, ...(37 more)... — all of it enters context, every turn it stays in history.</div></div>'},
+ {caption:'Trimmed to what the task actually needs', html:'<div class="node good"><div class="node-title">Trimmed order lookup</div><div class="node-body"><code>{status, carrier, eta, amount}</code> — the other 36+ fields were never relevant to "where\'s my order," so they never entered context.</div></div>'},
+ {caption:'"Lost in the middle" over a long session', html:'<div class="node bad"><div class="node-title">A fact stated 30 turns ago, buried mid-history</div><div class="node-body">The model reliably attends to the start and end of long input — a fact planted in the middle is the one most likely to get missed or misremembered.</div></div>'},
+ {caption:'The fix: a persistent case-facts block', html:'<div class="node good"><div class="node-title">Case facts, re-included every turn</div><div class="node-body"><code>{order_id, amount, promised_date}</code> — placed outside the summarized history, at the top of every prompt, so it never has a chance to get lost.</div></div>'},
+];
+
 function attachSteppers(id){
   if (id === 't11') buildStepper('loop', STEPS_LOOP);
   if (id === 't12') buildStepper('coord', STEPS_COORD);
   if (id === 't14') buildStepper('hook', STEPS_HOOK);
   if (id === 't16') buildStepper('decomp', STEPS_DECOMP);
   if (id === 't17') buildStepper('sess', STEPS_SESS);
+  if (id === 't51') buildStepper('ctx', STEPS_CTX);
 }
 
 /* =========================================================================
@@ -1490,6 +2165,198 @@ async function runSupportAgentLive(userMsg, out, forceFirstCall){
   }
 }
 
+/* ---------- Domain 2 live handlers ---------- */
+
+async function runToolDescLive(out){
+  out.clear();
+  const prompt = 'Please handle this for me: https://example.com/quarterly-report';
+  const schema = {type: 'object', properties: {input: {type: 'string'}}, required: ['input']};
+  const badTools = [
+    {name: 'analyze_content', description: 'Analyzes content', input_schema: schema},
+    {name: 'analyze_document', description: 'Analyzes a document', input_schema: schema},
+  ];
+  const goodTools = [
+    {name: 'extract_web_results', description: 'Extract structured data from a live web page given its URL. Use for pages you have NOT already downloaded.',
+      input_schema: {type: 'object', properties: {url: {type: 'string'}}, required: ['url']}},
+    {name: 'load_local_document', description: 'Parse a document already saved to local disk. Use for files the user uploaded or you already downloaded.',
+      input_schema: {type: 'object', properties: {file_path: {type: 'string'}}, required: ['file_path']}},
+  ];
+  try {
+    out.log('--- Vague, near-identical descriptions ---', 'meta');
+    let resp = await callClaude({messages: [{role: 'user', content: prompt}], tools: badTools, tool_choice: {type: 'any'}});
+    let picked = resp.content.find(b => b.type === 'tool_use');
+    out.log(picked ? ('picked: ' + picked.name) : '(no tool call)', 'meta');
+    out.log('');
+    out.log('--- Specific, differentiated descriptions ---', 'meta');
+    resp = await callClaude({messages: [{role: 'user', content: prompt}], tools: goodTools, tool_choice: {type: 'any'}});
+    picked = resp.content.find(b => b.type === 'tool_use');
+    out.log(picked ? ('picked: ' + picked.name) : '(no tool call)', picked && picked.name === 'extract_web_results' ? 'ok' : 'meta');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+const WEATHER_TOOL_JS = {name: 'get_weather', description: 'Get the current weather for a city.',
+  input_schema: {type: 'object', properties: {city: {type: 'string'}}, required: ['city']}};
+
+async function runToolChoiceLive(mode, out){
+  out.clear();
+  const msg = 'Hello! Just wanted to say hi, nothing else.';
+  out.log('> ' + msg, 'meta');
+  try {
+    const tool_choice = mode === 'auto' ? {type: 'auto'} : mode === 'any' ? {type: 'any'} : {type: 'tool', name: 'get_weather'};
+    out.log('tool_choice: ' + JSON.stringify(tool_choice), 'meta');
+    const resp = await callClaude({messages: [{role: 'user', content: msg}], tools: [WEATHER_TOOL_JS], tool_choice});
+    out.log('stop_reason = ' + resp.stop_reason, 'meta');
+    const toolUse = resp.content.find(b => b.type === 'tool_use');
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    if (toolUse) out.log('called get_weather(' + JSON.stringify(toolUse.input) + ') even though nothing weather-related was asked', mode === 'auto' ? 'err' : 'ok');
+    if (text) out.log('replied in text: ' + text, mode === 'auto' ? 'ok' : 'err');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+/* ---------- Domain 3 live handler ---------- */
+
+const MESSY_DATES_JS = '["March 3rd, 2024", "3/3/24", "2024-03-03"]';
+
+async function runRefinementLive(out){
+  out.clear();
+  try {
+    out.log('--- Vague instruction ---', 'meta');
+    let resp = await callClaude({messages: [{role: 'user', content: 'Normalize the dates in this list: ' + MESSY_DATES_JS}]});
+    out.log(resp.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+    out.log('');
+    out.log('--- Concrete input/output examples ---', 'meta');
+    const concrete = 'Normalize every date to YYYY-MM-DD. Examples:\n"March 3rd, 2024" -> "2024-03-03"\n' +
+      '"3/3/24" -> "2024-03-03"\n"2024-03-03" -> "2024-03-03" (already correct)\n\nList: ' + MESSY_DATES_JS;
+    resp = await callClaude({messages: [{role: 'user', content: concrete}]});
+    out.log(resp.content.filter(b => b.type === 'text').map(b => b.text).join(''), 'ok');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+/* ---------- Domain 4 live handlers ---------- */
+
+const REVIEW_SNIPPET_JS = 'function isEligibleForDiscount(orderCount) {\n' +
+  '  return orderCount >= 5  // policy: discount for MORE than 5 orders -- this is off by one, ' +
+  'a customer with exactly 5 wrongly qualifies\n}\n' +
+  '// (this function uses 2-space indent; rest of the file uses 4-space -- a style difference, not a bug)';
+
+async function runPrecisionLive(out){
+  out.clear();
+  try {
+    out.log('--- Vague: "only flag high-confidence issues" ---', 'meta');
+    let resp = await callClaude({messages: [{role: 'user',
+      content: 'Review this code. Only flag high-confidence issues.\n\n' + REVIEW_SNIPPET_JS}]});
+    out.log(resp.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+    out.log('');
+    out.log('--- Explicit categorical criteria ---', 'meta');
+    const explicit = 'Review this code. Flag ONLY bugs that cause incorrect output for valid input. ' +
+      'Do NOT flag style, naming, or anything matching this file\'s existing convention.\n\n' + REVIEW_SNIPPET_JS;
+    resp = await callClaude({messages: [{role: 'user', content: explicit}]});
+    out.log(resp.content.filter(b => b.type === 'text').map(b => b.text).join(''), 'ok');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+const INVOICE_TOOL_JS = {
+  name: 'extract_invoice', description: 'Extract structured invoice data.',
+  input_schema: {type: 'object', properties: {
+    vendor: {type: 'string'}, total_usd: {type: 'number'},
+    due_date: {type: ['string', 'null'], description: 'ISO date, or null if not stated'},
+    line_items: {type: 'array', items: {type: 'object',
+      properties: {desc: {type: 'string'}, amount_usd: {type: 'number'}}}},
+  }, required: ['vendor', 'total_usd', 'line_items']},
+};
+const INVOICE_TEXT_JS = 'Invoice from Acme Supplies. Line items: Widgets $120, Shipping $15. ' +
+  'Total: $135. (no due date is mentioned anywhere in this invoice)';
+
+async function runStructuredLive(out){
+  out.clear();
+  try {
+    const resp = await callClaude({messages: [{role: 'user', content: 'Extract this invoice:\n\n' + INVOICE_TEXT_JS}],
+      tools: [INVOICE_TOOL_JS], tool_choice: {type: 'tool', name: 'extract_invoice'}});
+    const toolUse = resp.content.find(b => b.type === 'tool_use');
+    out.log('Extracted (schema-guaranteed valid JSON):', 'meta');
+    out.log(JSON.stringify(toolUse.input, null, 2));
+    out.log('');
+    if (toolUse.input.due_date === null) out.log('✔ due_date correctly returned null — not fabricated', 'ok');
+    else out.log('✗ due_date was fabricated: ' + toolUse.input.due_date, 'err');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+const BUGGY_FN_JS = 'function getLastNItems(arr, n) {\n' +
+  '  return arr.slice(arr.length - n - 1, arr.length);  // off-by-one bug, injected for this demo\n' +
+  '}';
+
+async function runReviewLive(out){
+  out.clear();
+  try {
+    out.log('Reviewing this function (deliberately seeded with an off-by-one bug):', 'meta');
+    out.log(BUGGY_FN_JS);
+    const genMsgs = [
+      {role: 'user', content: 'Write a JS function getLastNItems(arr, n) that returns the last n items. Use exactly this implementation:\n' + BUGGY_FN_JS},
+    ];
+    const genResp = await callClaude({messages: genMsgs});
+    genMsgs.push({role: 'assistant', content: genResp.content});
+
+    out.log('');
+    out.log('--- Self-review: same conversation reviews its own code ---', 'meta');
+    genMsgs.push({role: 'user', content: 'Review the function above carefully for bugs.'});
+    const selfReview = await callClaude({messages: genMsgs});
+    out.log(selfReview.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+
+    out.log('');
+    out.log('--- Independent review: fresh call, zero prior reasoning ---', 'meta');
+    const freshReview = await callClaude({messages: [{role: 'user',
+      content: 'Review this function for bugs. You have no other context on how or why it was written:\n\n' + BUGGY_FN_JS}]});
+    out.log(freshReview.content.filter(b => b.type === 'text').map(b => b.text).join(''), 'ok');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+/* ---------- Domain 5 live handlers ---------- */
+
+const ESCALATE_TOOL_JS = {
+  name: 'escalate_to_human',
+  description: 'Hand off to a human agent with a structured summary. Use for: an explicit customer request ' +
+    'for a human, a genuine policy gap (the request is not covered by any rule you have), or no progress ' +
+    'after reasonable effort. Do NOT use for: mere complexity, negative sentiment alone, or low self-reported confidence.',
+  input_schema: {type: 'object', properties: {reason: {type: 'string'}, summary: {type: 'string'}}, required: ['reason', 'summary']},
+};
+const RESOLVE_TOOL_JS = {
+  name: 'resolve_case', description: 'Mark the case resolved with a one-line summary of what was done.',
+  input_schema: {type: 'object', properties: {summary: {type: 'string'}}, required: ['summary']},
+};
+
+async function runEscalationLive(userMsg, out){
+  out.clear();
+  out.log('> ' + userMsg, 'meta');
+  try {
+    const resp = await callClaude({messages: [{role: 'user', content: userMsg}],
+      tools: [ESCALATE_TOOL_JS, RESOLVE_TOOL_JS], tool_choice: {type: 'any'}});
+    const toolUse = resp.content.find(b => b.type === 'tool_use');
+    if (toolUse && toolUse.name === 'escalate_to_human'){
+      out.log('escalate_to_human(' + JSON.stringify(toolUse.input) + ')', 'meta');
+    } else if (toolUse){
+      out.log('resolve_case(' + JSON.stringify(toolUse.input) + ') — resolved without escalating', 'meta');
+    } else {
+      out.log(resp.content.filter(b => b.type === 'text').map(b => b.text).join(''));
+    }
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+async function runProvenanceLive(out){
+  out.clear();
+  const prompt = 'Combine these findings into a short report. If sources conflict, KEEP BOTH values and ' +
+    'annotate the conflict with both source ids and dates -- never silently pick one.\n\n' +
+    '- src-1 (published 2024-01): "Global XR market reached $28B in 2023."\n' +
+    '- src-2 (published 2026-06): "Global XR market reached $41B in 2023."';
+  try {
+    const resp = await callClaude({messages: [{role: 'user', content: prompt}]});
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    const preserved = /28\s*B/i.test(text) && /41\s*B/i.test(text);
+    out.log(text, preserved ? 'ok' : 'err');
+    out.log('');
+    out.log(preserved ? '✔ both values preserved with attribution' : '✗ one value appears to have been dropped', preserved ? 'ok' : 'err');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
 function attachLiveRunners(id){
   if (id === 't11'){
     document.getElementById('loop-run').onclick = runBtnGuard('loop-run', () => runLoopLive(liveConsole('loop-console')));
@@ -1509,6 +2376,39 @@ function attachLiveRunners(id){
   if (id === 't16'){
     document.getElementById('chain-run').onclick = runBtnGuard('chain-run', () => runChainingLive(liveConsole('decomp-console')));
     document.getElementById('dynamic-run').onclick = runBtnGuard('dynamic-run', () => runDynamicLive(liveConsole('decomp-console')));
+  }
+  if (id === 't21'){
+    document.getElementById('tooldesc-run').onclick = runBtnGuard('tooldesc-run', () => runToolDescLive(liveConsole('tooldesc-console')));
+  }
+  if (id === 't22'){
+    const out = () => liveConsole('toolchoice-console');
+    document.getElementById('tc-auto').onclick = runBtnGuard('tc-auto', () => runToolChoiceLive('auto', out()));
+    document.getElementById('tc-any').onclick = runBtnGuard('tc-any', () => runToolChoiceLive('any', out()));
+    document.getElementById('tc-forced').onclick = runBtnGuard('tc-forced', () => runToolChoiceLive('forced', out()));
+  }
+  if (id === 't35'){
+    document.getElementById('refine-run').onclick = runBtnGuard('refine-run', () => runRefinementLive(liveConsole('refine-console')));
+  }
+  if (id === 't41'){
+    document.getElementById('precision-run').onclick = runBtnGuard('precision-run', () => runPrecisionLive(liveConsole('precision-console')));
+  }
+  if (id === 't43'){
+    document.getElementById('structured-run').onclick = runBtnGuard('structured-run', () => runStructuredLive(liveConsole('structured-console')));
+  }
+  if (id === 't46'){
+    document.getElementById('review-run').onclick = runBtnGuard('review-run', () => runReviewLive(liveConsole('review-console')));
+  }
+  if (id === 't52'){
+    const out = () => liveConsole('escalation-console');
+    document.getElementById('esc-explicit').onclick = runBtnGuard('esc-explicit', () =>
+      runEscalationLive('I don\'t want to talk to a bot. Get me a human right now, please.', out()));
+    document.getElementById('esc-gap').onclick = runBtnGuard('esc-gap', () =>
+      runEscalationLive('Can you price-match a competitor\'s store that isn\'t on your approved price-match list? Our policy only covers the stores on that list.', out()));
+    document.getElementById('esc-frustrated').onclick = runBtnGuard('esc-frustrated', () =>
+      runEscalationLive('Ugh, contacting support is always such a hassle, this is so annoying. Anyway -- what payment methods do you accept?', out()));
+  }
+  if (id === 't55'){
+    document.getElementById('provenance-run').onclick = runBtnGuard('provenance-run', () => runProvenanceLive(liveConsole('provenance-console')));
   }
 }
 
