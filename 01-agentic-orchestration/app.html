@@ -214,7 +214,7 @@
       <input type="password" id="api-key" placeholder="sk-ant-... or your Azure key" autocomplete="off">
       <label for="api-base">Base URL <span style="text-transform:none;">(optional — blank = api.anthropic.com)</span></label>
       <input type="text" id="api-base" placeholder="https://your-resource.services.ai.azure.com/anthropic">
-      <label for="api-model">Model</label>
+      <label for="api-model">Model <span style="text-transform:none;">(on Azure: your deployment name, not Anthropic's model id)</span></label>
       <input type="text" id="api-model" placeholder="claude-sonnet-5" value="claude-sonnet-5">
       <label class="remember"><input type="checkbox" id="api-remember"> Remember for this browser tab only</label>
       <button class="primary savebtn" onclick="saveApiSettings()">Connect</button>
@@ -337,7 +337,12 @@ function friendlyError(e){
   if (e.message === 'NO_KEY') return 'No API key set. Click "Live API" in the sidebar and paste yours in.';
   if (e.status === 401) return 'Auth failed (401) at ' + url + ' — the key was rejected. Double-check it in the Live API panel.';
   if (e.status === 400 && /credit balance/i.test(e.message)) return 'This key has no credit balance. Add credits, then try again.';
-  if (e.status === 404) return '404 at ' + url + ' — the base URL is likely wrong. Check it against your provider\'s docs.';
+  if (e.status === 404 && /DeploymentNotFound/i.test(e.rawBody || e.message)) {
+    return '404: DeploymentNotFound for model "' + apiState.model + '" at ' + url + ' — the Model field ' +
+      'does not match your Azure deployment name. Set Model to your exact Azure deployment name (not ' +
+      'Anthropic\'s own model id) and try again.';
+  }
+  if (e.status === 404) return '404 at ' + url + ' — the base URL (or, for Azure, the model/deployment name) is likely wrong. Check it against your provider\'s docs.';
   if (e.status) return 'HTTP ' + e.status + ' at ' + url + ': ' + e.message;
   if (e instanceof TypeError) {
     return 'Could not reach ' + url + ' at all (browser blocked it before any response came back). ' +
