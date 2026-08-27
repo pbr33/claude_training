@@ -1753,48 +1753,143 @@ function renderT24(){
 
 /* ===================== DOMAIN 3 — Claude Code Configuration & Workflows ===================== */
 
-const CODE_CLAUDE_HIERARCHY = `# CLAUDE.md (project root -- committed, shared with the whole team)
+const LAB_STEPS = [
+  {
+    title: 'Set up the project',
+    body: 'A small fictional project, <code>orderflow</code>, an internal order-processing API. You build these files for real, then use the actual Claude Code CLI to confirm each mechanism.',
+    code: `mkdir orderflow && cd orderflow
+git init
+mkdir -p src/payments src/utils .claude/rules .claude/commands .claude/skills`,
+  },
+  {
+    title: 'The three CLAUDE.md scopes — project',
+    body: 'Committed, shared with the whole team.',
+    code: `cat > CLAUDE.md <<'EOF'
+# orderflow
+
 - Use TypeScript strict mode everywhere.
 - Run \`npm test\` before considering any change done.
+- Prefer editing existing files over creating new ones.
+EOF`,
+  },
+  {
+    title: 'The three CLAUDE.md scopes — directory',
+    body: 'Committed, but scoped to one sensitive area.',
+    code: `cat > src/payments/CLAUDE.md <<'EOF'
+# src/payments/ — extra caution required
 
-# src/payments/CLAUDE.md (directory-level -- committed, but only loads
-# once Claude actually reads/edits a file under src/payments/)
 - Never log a full card number, even in debug output.
+- Any change here needs an explicit "why is this safe" comment in the diff.
+EOF`,
+    tryIt: 'Run <code>claude</code> from the orderflow root and ask "What does CLAUDE.md say about testing?" Then <code>cd src/payments</code> and ask a fresh session "What does CLAUDE.md say about card numbers?" — it should mention it now, but would not have from the project root, since the directory-level file only loads once Claude actually reads or edits something in that subtree. Confirm what actually loaded with <code>/context</code> — look for the "Memory files" section.',
+  },
+  {
+    title: 'The three CLAUDE.md scopes — user (personal)',
+    body: 'Lives outside the repo entirely — never shared via version control.',
+    code: `mkdir -p ~/.claude
+cat >> ~/.claude/CLAUDE.md <<'EOF'
 
-# ~/.claude/CLAUDE.md (user scope -- lives outside the repo entirely,
-# never reaches a teammate no matter how long it's been there)
+# Personal preferences (orderflow)
 - I prefer functional components over class components.
+EOF`,
+  },
+  {
+    title: 'The "new teammate" bug, reproduced on purpose',
+    body: 'That preference above lives only in your personal <code>~/.claude/CLAUDE.md</code> — it will never reach a teammate, because that file is not in the repo at all. Run <code>git status</code>: it will not even show up as untracked, since it is outside the project directory entirely.',
+    tryIt: 'Move that bullet from <code>~/.claude/CLAUDE.md</code> into the project\'s <code>CLAUDE.md</code> instead. Now it is committed, and <code>git log</code> on a teammate\'s clone would show it arriving. That is the fix for "a new teammate is not getting an instruction everyone else follows" — almost always this exact scope mistake.',
+  },
+  {
+    title: '@import — organizing, not reducing context',
+    body: 'Splitting a style guide into its own file feels like it should reduce context. It does not.',
+    code: `cat > STYLE_GUIDE.md <<'EOF'
+# Style guide
+- 2-space indentation.
+- No default exports.
+- Prefer named function declarations over arrow-function consts for top-level functions.
+EOF
 
-# ---- @import: organizes, does NOT reduce what loads ----
-# CLAUDE.md
+cat > CLAUDE.md <<'EOF'
+# orderflow
+
 @STYLE_GUIDE.md
-- Run \`npm test\` before considering any change done.
-# STYLE_GUIDE.md's full content still loads at session start, same as if
-# it had been pasted directly into CLAUDE.md.
 
-# ---- .claude/rules/testing.md -- THIS is what actually loads conditionally ----
+- Run \`npm test\` before considering any change done.
+EOF`,
+    tryIt: 'Run <code>/context</code> again. STYLE_GUIDE.md\'s content is now part of what loaded, exactly as if you had pasted it directly into CLAUDE.md — same context cost, just organized into an easier-to-review file. Only rules (next step) actually cut what loads.',
+  },
+  {
+    title: '.claude/rules/ — the one that actually loads conditionally',
+    body: 'A rule with YAML <code>paths:</code> frontmatter only loads when Claude touches a matching file.',
+    code: `cat > .claude/rules/testing.md <<'EOF'
 ---
 paths: ["**/*.test.ts"]
 ---
+
 # Testing conventions
 - Every test file starts with a comment naming the function under test.
-# A session that never touches a *.test.ts file never pays for this at all.
+- Use describe/it, never a bare test().
+EOF
 
-# ---- .claude/commands/review.md (shared -- committed, everyone gets /review) ----
+# a file that matches...
+touch src/payments/refund.test.ts
+# ...and one that doesn't
+touch src/payments/refund.ts`,
+    tryIt: 'Fresh session, ask Claude to read <code>refund.ts</code> (the non-test file). Check <code>/context</code> — the testing rule should NOT appear. Now, fresh session again, ask it to read <code>refund.test.ts</code> instead. Check <code>/context</code> again — now it does. That is the real context saving @import does not give you.',
+  },
+  {
+    title: 'Commands: shared vs. personal',
+    body: 'Same shape as CLAUDE.md\'s user/project split, applied to slash commands.',
+    code: `mkdir -p .claude/commands
+cat > .claude/commands/review.md <<'EOF'
 Review the current diff for bugs, security issues, and style-guide violations.
+Report findings as a bulleted list, most severe first.
+EOF
 
-# ---- ~/.claude/commands/todo.md (personal -- only you have /todo) ----
+mkdir -p ~/.claude/commands
+cat > ~/.claude/commands/todo.md <<'EOF'
 Scan the current diff for any new TODO comments and list them with file:line.
-
-# ---- .claude/skills/audit-dependencies/SKILL.md ----
+EOF`,
+    tryIt: '<code>/review</code> works for anyone who clones this repo — it is in <code>.claude/commands/</code>, which you will <code>git add</code>. <code>/todo</code> only works for you, same as the user-scope CLAUDE.md above.',
+  },
+  {
+    title: 'A skill with context: fork, allowed-tools, and argument-hint',
+    body: 'The richer, frontmatter-driven sibling of a slash command.',
+    code: `mkdir -p .claude/skills/audit-dependencies
+cat > .claude/skills/audit-dependencies/SKILL.md <<'EOF'
 ---
 description: Audit dependencies for known vulnerabilities and outdated majors
-context: fork          # runs in its own isolated sub-conversation --
-                        # the main session gets a summary, not raw npm-audit noise
-allowed-tools: Read, Bash   # cannot Edit anything, even if the main session can
+context: fork
+allowed-tools: Read, Bash
 argument-hint: [package-name]
 ---
-Run \`npm audit\` and \`npm outdated\`, report findings grouped by severity.`;
+
+Run \`npm audit\` and \`npm outdated\`, cross-reference against package.json, and
+report findings grouped by severity. If [package-name] is given, focus only
+on that package and its transitive dependents.
+EOF`,
+    tryIt: 'Run <code>/audit-dependencies</code> with no argument — Claude Code should prompt for <code>[package-name]</code> rather than guessing. Run it for real (needs a <code>package.json</code> — <code>npm init -y</code> first if you don\'t have one): notice the potentially long npm-audit output does not dump into your main conversation, because <code>context: fork</code> ran it in its own isolated sub-conversation. Try removing <code>allowed-tools</code> and re-running — the skill can now use whatever the main session can, including Edit, a materially less contained skill.',
+  },
+  {
+    title: 'Commit what belongs in version control',
+    body: 'Confirm the personal files never show up.',
+    code: `git add CLAUDE.md STYLE_GUIDE.md src/payments/CLAUDE.md \\
+  .claude/rules/testing.md .claude/commands/review.md \\
+  .claude/skills/audit-dependencies/SKILL.md
+git status   # confirm ~/.claude/CLAUDE.md and ~/.claude/commands/todo.md never appear here
+git commit -m "Configure orderflow's Claude Code setup"`,
+  },
+];
+
+function renderLabSteps(){
+  return LAB_STEPS.map((s, i) => {
+    let html = '<div class="card"><h3 style="margin-top:0;">'+(i+1)+'. '+s.title+'</h3>'+
+      '<p style="font-size:13.5px;line-height:1.6;margin:0 0 '+(s.code ? '12px' : '0')+';">'+s.body+'</p>';
+    if (s.code) html += '<pre class="code" style="max-height:none;">'+pyHighlight(s.code)+'</pre>';
+    if (s.tryIt) html += '<div class="note-inline" style="margin-top:12px;margin-bottom:0;"><b>Try it:</b> '+s.tryIt+'</div>';
+    html += '</div>';
+    return html;
+  }).join('');
+}
 
 function renderT31(){
   return '<div class="taghead"><span class="pill">Tasks 3.1–3.3</span></div>'+
@@ -1824,12 +1919,13 @@ paths: ["src/api/**/*.ts"]
 - Return errors as { code, message }, never a bare string`,
   })+
   '<h3>The full hands-on lab</h3>'+
-  '<div class="card">'+codePanelHTML('lab_claude_md_hierarchy', CODE_CLAUDE_HIERARCHY, null, false)+'</div>'+
-  '<div class="note-inline">That\'s the key files condensed — the complete step-by-step version, with what to '+
-  'run and what to check after each step, is at '+
-  '<a href="03-claude-code-config/labs/lab_claude_md_hierarchy.md" target="_blank">'+
-  '<code>03-claude-code-config/labs/lab_claude_md_hierarchy.md</code></a> in the repo (opens if you\'re serving '+
-  'this over <code>http://localhost</code> — see the README if it 404s from a plain <code>file://</code> open).</div>'+
+  '<p class="dek" style="margin-top:-6px;">Every step below is real — build these actual files in a scratch '+
+  'directory and confirm each mechanism with the real Claude Code CLI. No API key needed anywhere in it.</p>'+
+  renderLabSteps()+
+  '<div class="note-inline"><b>Exam traps this lab makes concrete:</b> <code>@import</code> organizes, it does '+
+  'not reduce context — only <code>paths:</code>-scoped rules load conditionally. Directory-level CLAUDE.md '+
+  'loads on demand, not at session start. User-scope files are invisible to teammates by construction, not by '+
+  'convention. <code>context: fork</code> isolates a skill\'s own exploration and output, not just its tools.</div>'+
   quizMini('3.1')+quizMini('3.2')+quizMini('3.3');
 }
 
