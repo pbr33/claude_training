@@ -1758,6 +1758,11 @@ paths: ["src/api/**/*.ts"]
 - Every handler validates its input with zod before touching the DB
 - Return errors as { code, message }, never a bare string`,
   })+
+  '<div class="note-inline"><b>Want the full hands-on version?</b> '+
+  '<code>03-claude-code-config/labs/lab_claude_md_hierarchy.md</code> in the repo walks through building all '+
+  'three CLAUDE.md scopes, an <code>@import</code>, a path-scoped rule, a shared command, a personal command, '+
+  'and a <code>context: fork</code> skill — as real files you create and test with the actual Claude Code CLI, '+
+  'step by step, no API key needed.</div>'+
   quizMini('3.1')+quizMini('3.2')+quizMini('3.3');
 }
 
