@@ -121,7 +121,8 @@
       font-size:12px;}
   .api-panel .remember{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;color:var(--ink-soft);}
   .api-panel .remember input{width:auto;}
-  .api-panel .hint{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;word-break:break-word;}
+  .api-panel .hint{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;word-break:break-word;
+      white-space:pre-wrap;font-family:'IBM Plex Mono',monospace;max-height:220px;overflow-y:auto;}
   .api-panel .hint.ok{color:var(--good);}
   .api-panel .hint.err{color:var(--bad);}
   .api-panel .testbtn{margin-top:8px;width:100%;}
@@ -371,10 +372,15 @@ async function callClaude({messages, tools, tool_choice, system}){
     console.error('callClaude: fetch to', url, 'failed before any response:', networkErr);
     throw networkErr;
   }
-  const data = await resp.json().catch(() => ({}));
+  const contentType = resp.headers.get('content-type') || '';
+  const rawText = await resp.text();
+  let data = {};
+  try { data = JSON.parse(rawText); } catch(e){ /* not JSON -- handled below via rawBody */ }
   if (!resp.ok){
     const err = new Error((data && data.error && data.error.message) || resp.statusText);
     err.status = resp.status;
+    err.contentType = contentType;
+    err.rawBody = rawText;
     throw err;
   }
   return data;
@@ -391,7 +397,19 @@ async function testApiConnection(){
     el.textContent = '✔ Connected. Model replied: ' + text;
     el.className = 'hint ok';
   } catch (e) {
-    el.textContent = '✗ ' + friendlyError(e);
+    let msg = '✗ ' + friendlyError(e);
+    if (e.rawBody){
+      const looksLikeJson = /^\s*[{[]/.test(e.rawBody);
+      msg += '\n\nRaw response (' + (e.contentType || 'unknown content-type') + '):\n' +
+        e.rawBody.slice(0, 500) + (e.rawBody.length > 500 ? '…' : '');
+      if (!looksLikeJson){
+        msg += '\n\nThis does not look like a JSON API response -- it looks like something else ' +
+          '(a proxy, firewall, or security tool\'s block page, or a generic web server error page) ' +
+          'intercepted the request before it reached Azure/Anthropic. Check for a corporate proxy, ' +
+          'VPN, or security software that might be blocking this domain.';
+      }
+    }
+    el.textContent = msg;
     el.className = 'hint err';
   }
 }
