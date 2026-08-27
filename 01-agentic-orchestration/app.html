@@ -299,10 +299,22 @@ function toggleApiPanel(){
   document.getElementById('api-panel').classList.toggle('open');
 }
 
+function syncApiStateFromInputs(){
+  // Every live call runs this first, so whatever is currently typed in the
+  // panel is what gets used -- no separate "did you remember to click
+  // Connect" step required. Connect/saveApiSettings below still exists for
+  // persisting to sessionStorage and updating the status indicator.
+  const keyEl = document.getElementById('api-key');
+  const baseEl = document.getElementById('api-base');
+  const modelEl = document.getElementById('api-model');
+  if (!keyEl) return; // sidebar not in the DOM yet
+  apiState.apiKey = keyEl.value.trim();
+  apiState.baseUrl = baseEl.value.trim();
+  apiState.model = modelEl.value.trim() || 'claude-sonnet-5';
+}
+
 function saveApiSettings(){
-  apiState.apiKey = document.getElementById('api-key').value.trim();
-  apiState.baseUrl = document.getElementById('api-base').value.trim();
-  apiState.model = document.getElementById('api-model').value.trim() || 'claude-sonnet-5';
+  syncApiStateFromInputs();
   if (document.getElementById('api-remember').checked){
     try { sessionStorage.setItem('ccarf-d1-api', JSON.stringify(apiState)); } catch(e){}
   } else {
@@ -355,6 +367,8 @@ function friendlyError(e){
 }
 
 async function callClaude({messages, tools, tool_choice, system}){
+  syncApiStateFromInputs();
+  updateApiStatusUI();
   if (!apiState.apiKey) throw new Error('NO_KEY');
   const url = resolveMessagesUrl();
   const body = { model: apiState.model || 'claude-sonnet-5', max_tokens: 1024, messages };
