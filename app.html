@@ -1967,28 +1967,42 @@ function renderMockExamIntro(){
   const examSize = Object.values(DOMAIN_TARGET_COUNTS).reduce((a, b) => a + b, 0);
   const rows = Object.keys(DOMAIN_TARGET_COUNTS).map(d =>
     '<tr><td>'+d+' — '+DOMAIN_NAMES[d]+'</td><td>'+DOMAIN_TARGET_COUNTS[d]+'</td><td>'+DOMAIN_WEIGHTS[d]+'</td></tr>').join('');
+  const modeCards = EXAM_MODES.map(m =>
+    '<div class="card" style="text-align:center;padding:20px;">'+
+    '<h3 style="margin:0 0 4px;">'+m.label+'</h3>'+
+    '<p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 4px;">'+m.desc+'</p>'+
+    '<p style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:var(--accent);margin:0 0 14px;">'+m.size+' questions · '+m.minutes+' min</p>'+
+    '<button class="run" onclick="startMockExam(\''+m.key+'\')">&#9654; Start</button>'+
+    '</div>'
+  ).join('');
+  const domainOptions = Object.keys(DOMAIN_NAMES).map(d =>
+    '<option value="'+d+'">Domain '+d+' — '+DOMAIN_NAMES[d]+'</option>').join('');
+
   return '<h2>Mock Exam</h2>'+
-  '<p class="dek">'+examSize+' questions drawn from a bank of '+QUIZ.length+', one attempt, a real 120-minute '+
-  'countdown, and no answer revealed until you submit — the closest thing here to actual exam conditions. '+
-  'Scored on the real scale: 100–1000, 720 to pass.</p>'+
+  '<p class="dek">Every mode below draws from the same '+QUIZ.length+'-question original bank, weighted to match '+
+  'the real domain blueprint, no answers revealed until you submit. The Full Exam matches real conditions exactly '+
+  '— 60 questions, 120 minutes, scored 100–1000 with 720 to pass.</p>'+
+  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px;">'+modeCards+'</div>'+
+  '<div class="card"><h3 style="margin-top:0">Domain Drill</h3>'+
+  '<p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;">Every original question for one domain only — for when you know exactly which one needs the work.</p>'+
+  '<div class="runbar"><select id="drill-domain" style="padding:9px 12px;border-radius:7px;border:1px solid var(--hair);background:var(--paper);color:var(--ink);font-family:\'IBM Plex Mono\',monospace;font-size:12px;">'+domainOptions+'</select>'+
+  '<button class="run" onclick="startDomainDrill()">&#9654; Start drill</button></div></div>'+
   '<div class="card"><h3 style="margin-top:0">Exactly how the real exam is weighted</h3>'+
-  '<table class="decision-table"><tr><th>Domain</th><th>Questions</th><th>Weight</th></tr>'+
+  '<table class="decision-table"><tr><th>Domain</th><th>Full-exam questions</th><th>Weight</th></tr>'+
   rows+
   '<tr><td><b>Total</b></td><td><b>'+examSize+'</b></td><td><b>100%</b></td></tr></table></div>'+
   '<div class="note-inline"><b>Scoring note:</b> the real exam\'s 100–1000 scale is produced by an undisclosed '+
-  'psychometric model. This uses a straightforward linear approximation (100 + correct/'+examSize+' × 900) so you '+
-  'get a directionally honest sense of where you stand — treat the pass/fail line as a strong signal, not an '+
-  'exact prediction of your real scaled score.</div>'+
-  '<div class="card" style="text-align:center;padding:32px;">'+
-  '<button class="run" style="font-size:13px;padding:14px 28px;" onclick="startMockExam()">&#9654; Start the 120-minute mock exam</button>'+
-  '<p style="font-size:12px;color:var(--ink-soft);margin-top:12px;">Questions are drawn fresh and shuffled each '+
-  'attempt. Once started, the timer runs even if you navigate away from this page.</p>'+
-  '</div>';
+  'psychometric model. Every mode here uses the same linear approximation (100 + correct/total × 900) so you get '+
+  'a directionally honest sense of where you stand — treat the pass/fail line as a strong signal, not an exact '+
+  'prediction of your real scaled score. Questions are drawn fresh and shuffled every attempt, and the timer runs '+
+  'even if you navigate away from this page.</div>';
 }
 
 function renderMockExamActive(){
-  let html = '<div class="exam-timer"><div><span class="clock" id="exam-clock">120:00</span> '+
-    '<span class="meta">remaining</span></div>'+
+  const initM = String(Math.floor(mockExam.timeLeft / 60)).padStart(2, '0');
+  const initS = String(mockExam.timeLeft % 60).padStart(2, '0');
+  let html = '<div class="exam-timer"><div><span class="clock" id="exam-clock">'+initM+':'+initS+'</span> '+
+    '<span class="meta">remaining · '+mockExam.modeLabel+'</span></div>'+
     '<div class="meta" id="exam-progress">0 / '+mockExam.questions.length+' answered</div>'+
     '<button onclick="submitMockExam()">Submit now</button></div>';
   mockExam.questions.forEach((q, i) => {
@@ -2015,7 +2029,7 @@ function renderMockExamResults(){
   const domainNames = {1:'Agentic Architecture & Orchestration',2:'Tool Design & MCP Integration',
     3:'Claude Code Configuration & Workflows',4:'Prompt Engineering & Structured Output',5:'Context Management & Reliability'};
 
-  let html = '<h2>Mock Exam Results</h2>'+
+  let html = '<h2>'+mockExam.modeLabel+' Results</h2>'+
     '<div class="result-banner '+(passed?'pass':'fail')+'">'+
     '<div class="bigscore">'+scaled+'</div>'+
     '<div><div style="font-weight:700;font-size:16px;">'+(passed?'PASS':'NOT YET')+' · 720 to pass</div>'+
@@ -2047,7 +2061,14 @@ function renderMockExamResults(){
   return html;
 }
 
-let mockExam = {phase: 'intro', questions: [], answers: {}, timeLeft: 0, timerHandle: null};
+let mockExam = {phase: 'intro', questions: [], answers: {}, timeLeft: 0, timerHandle: null, minutes: 120, modeLabel: 'Full Exam'};
+
+const EXAM_MODES = [
+  {key: 'quick', label: 'Quick Sprint', size: 10, minutes: 20, desc: 'A fast gut-check across all 5 domains.'},
+  {key: 'focused', label: 'Focused Session', size: 20, minutes: 40, desc: 'A solid single-sitting practice run.'},
+  {key: 'deep', label: 'Deep Practice', size: 30, minutes: 60, desc: 'Half-length, still domain-weighted the real way.'},
+  {key: 'full', label: 'Full Exam', size: 60, minutes: 120, desc: 'Real length, real weighting, real 720 cutoff.'},
+];
 
 function shuffleArray(arr){
   const a = arr.slice();
@@ -2058,25 +2079,65 @@ function shuffleArray(arr){
   return a;
 }
 
-function drawWeightedExam(){
+function scaledDomainCounts(size){
+  // Largest-remainder rounding so the per-domain counts always sum exactly
+  // to `size`, while staying proportional to the real 16/11/12/12/9 weights.
+  const domains = Object.keys(DOMAIN_TARGET_COUNTS);
+  const exact = domains.map(d => DOMAIN_TARGET_COUNTS[d] * size / 60);
+  const counts = {};
+  let allocated = 0;
+  domains.forEach((d, i) => { counts[d] = Math.floor(exact[i]); allocated += counts[d]; });
+  const byRemainder = domains.map((d, i) => ({d, frac: exact[i] - Math.floor(exact[i])})).sort((a, b) => b.frac - a.frac);
+  let remainder = size - allocated;
+  for (let i = 0; i < remainder; i++) counts[byRemainder[i % byRemainder.length].d]++;
+  return counts;
+}
+
+function drawWeightedExam(size){
   const byDomain = {};
   QUIZ.forEach(q => {
     const d = q.tag.split('.')[0];
     (byDomain[d] = byDomain[d] || []).push(q);
   });
+  const counts = scaledDomainCounts(size);
   let drawn = [];
-  Object.keys(DOMAIN_TARGET_COUNTS).forEach(d => {
+  Object.keys(counts).forEach(d => {
     const pool = shuffleArray(byDomain[d] || []);
-    drawn = drawn.concat(pool.slice(0, DOMAIN_TARGET_COUNTS[d]));
+    drawn = drawn.concat(pool.slice(0, Math.min(counts[d], pool.length)));
   });
   return shuffleArray(drawn);
 }
 
-function startMockExam(){
-  mockExam.questions = drawWeightedExam();
+function drawDomainDrill(domain){
+  const pool = shuffleArray(QUIZ.filter(q => q.tag.split('.')[0] === String(domain)));
+  return pool;
+}
+
+function startMockExam(modeKey){
+  const mode = EXAM_MODES.find(m => m.key === modeKey) || EXAM_MODES[EXAM_MODES.length - 1];
+  mockExam.questions = drawWeightedExam(mode.size);
   mockExam.answers = {};
   mockExam.phase = 'active';
-  mockExam.timeLeft = 120 * 60;
+  mockExam.minutes = mode.minutes;
+  mockExam.modeLabel = mode.label;
+  mockExam.timeLeft = mode.minutes * 60;
+  showSection('mockexam');
+  mockExam.timerHandle = setInterval(() => {
+    mockExam.timeLeft--;
+    updateExamClock();
+    if (mockExam.timeLeft <= 0) submitMockExam();
+  }, 1000);
+}
+
+function startDomainDrill(){
+  const domain = document.getElementById('drill-domain').value;
+  const questions = drawDomainDrill(domain);
+  mockExam.questions = questions;
+  mockExam.answers = {};
+  mockExam.phase = 'active';
+  mockExam.minutes = Math.max(10, questions.length * 2);
+  mockExam.modeLabel = 'Domain ' + domain + ' Drill';
+  mockExam.timeLeft = mockExam.minutes * 60;
   showSection('mockexam');
   mockExam.timerHandle = setInterval(() => {
     mockExam.timeLeft--;
