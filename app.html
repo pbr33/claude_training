@@ -195,6 +195,30 @@
   .quiz-summary .score{font-family:'Fraunces',serif;font-weight:700;font-size:34px;color:var(--c1);}
   .quiz-summary .detail{font-size:13px;color:var(--ink-soft);line-height:1.5;}
 
+  /* mock exam */
+  .exam-timer{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;
+      background:var(--card);border:1px solid var(--hair);border-radius:10px;padding:12px 18px;margin-bottom:18px;
+      box-shadow:0 8px 24px -16px rgba(0,0,0,.4);}
+  .exam-timer .clock{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;color:var(--ink);}
+  .exam-timer .clock.low{color:var(--bad);}
+  .exam-timer .meta{font-size:12px;color:var(--ink-soft);}
+  .exam-q{border:1px solid var(--hair);border-radius:10px;padding:16px 18px;margin-bottom:12px;background:var(--card);}
+  .exam-q .qnum{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);margin-bottom:8px;display:block;}
+  .exam-opt{display:block;width:100%;text-align:left;padding:9px 12px;border-radius:8px;border:1px solid var(--hair);
+       background:var(--paper);color:var(--ink);font-size:13px;margin-bottom:7px;cursor:pointer;font-family:inherit;}
+  .exam-opt:hover{border-color:var(--c1);}
+  .exam-opt.selected{border-color:var(--c1);background:var(--c1bg);font-weight:600;}
+  .exam-q.unanswered{border-left:3px solid var(--accent);}
+  .result-banner{display:flex;align-items:center;gap:20px;padding:24px 28px;border-radius:14px;margin-bottom:22px;}
+  .result-banner.pass{background:var(--goodbg);border:1px solid var(--good);}
+  .result-banner.fail{background:var(--badbg);border:1px solid var(--bad);}
+  .result-banner .bigscore{font-family:'Fraunces',serif;font-weight:700;font-size:44px;}
+  .result-banner.pass .bigscore{color:var(--good);}
+  .result-banner.fail .bigscore{color:var(--bad);}
+  .review-answer{font-size:12.5px;padding:2px 8px;border-radius:10px;font-family:'IBM Plex Mono',monospace;}
+  .review-answer.correct{background:var(--goodbg);color:var(--good);}
+  .review-answer.wrong{background:var(--badbg);color:var(--bad);}
+
   /* capstone checklist */
   .steplist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
   .steplist li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.55;
@@ -281,7 +305,8 @@ const SECTIONS = [
   {id:'t53', num:'5.3/5.4', label:'Error Propagation', group:'d5'},
   {id:'t55', num:'5.5/5.6', label:'Review & Provenance', group:'d5'},
 
-  {id:'quiz', num:'', label:'Full Practice Exam', group:null},
+  {id:'quiz', num:'', label:'Practice Quiz (untimed)', group:null},
+  {id:'mockexam', num:'', label:'Mock Exam (60, timed)', group:null},
 ];
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -928,6 +953,59 @@ const QUIZ = [
  {tag:'5.6', stem:'Two credible sources report different figures for the same statistic, and one source is 2.5 years newer than the other. Best synthesis behavior?',
   opts:['Average the two values','Use only the newer source and discard the older one','Keep both values, attribute each to its source and date, and note the newer figure may be a revision rather than a contradiction','Flag the entire report as unreliable and omit the statistic'],
   correct:2, why:'Preserving both values with source and date attribution respects that a real temporal gap can explain an apparent conflict -- averaging or silently picking one discards information the reader needs to judge for themselves.'},
+
+ {tag:'1.2', stem:'A coordinator checks whether an incoming query is a quick fact lookup or a long-form research request, and only invokes a summarizer subagent for the latter -- rather than always running the full pipeline regardless of query type. This is:',
+  opts:['An anti-pattern -- always run the identical fixed pipeline for consistency','The documented approach -- analyze query complexity and invoke only the subagents actually needed','Only acceptable if the coordinator asks the user for permission first','Irrelevant, since subagents are cheap enough to invoke unconditionally'],
+  correct:1, why:'Dynamically selecting which subagents to invoke, rather than always routing through the full pipeline, is exactly the coordinator skill the guide describes -- it avoids wasted latency and cost on queries that don\'t need the full pipeline.'},
+ {tag:'1.3', stem:'A subagent\'s <code>AgentDefinition</code> lists <code>tools=["Read", "Grep"]</code>, but the coordinator\'s own <code>allowed_tools</code> does not include <code>Agent</code>. What happens when the coordinator tries to invoke this subagent?',
+  opts:['It\'s invoked normally -- the subagent\'s own tool list is what matters','The invocation is denied or falls through to a permission prompt, regardless of the subagent\'s own tool restrictions','It runs with no tools at all','The subagent\'s definition is ignored and a generic agent runs instead'],
+  correct:1, why:'Spawning a subagent is itself a tool call. The coordinator needs its own approval to use the spawning mechanism -- the subagent\'s internal tool restrictions are a separate, later concern that never gets reached if spawning itself is blocked.'},
+ {tag:'1.6', stem:'A team builds a fixed weekly compliance report -- the same 5 checks, in the same order, every single week -- and considers switching to dynamic tool-driven decomposition to "future-proof" it. Best assessment?',
+  opts:['Good idea -- dynamic decomposition is strictly more capable and should be the default','Unnecessary -- the task is fully predictable, so a fixed prompt-chained pipeline is simpler, cheaper, and more predictable here','Only reasonable if the report ever grows past 10 checks','Neither approach matters -- decomposition strategy has no real effect on cost or reliability'],
+  correct:1, why:'When every step is known in advance and never changes, prompt chaining is the better fit. Dynamic decomposition adds non-determinism and cost for flexibility this task doesn\'t need.'},
+
+ {tag:'2.2', stem:'An MCP tool\'s structured error responses correctly distinguish a retryable timeout from a non-retryable policy-violation error via an <code>isRetryable</code> flag. The calling agent retries the policy-violation error twice anyway before giving up. What\'s the actual bug?',
+  opts:['The tool\'s error format is wrong','The agent isn\'t reading and respecting the <code>isRetryable</code> flag -- it should never retry an error marked non-retryable','Policy violations should never be returned as errors at all','The tool needs a longer timeout'],
+  correct:1, why:'The whole point of structured error metadata is that the caller acts on it. A well-designed error response was produced here -- the defect is in the agent ignoring the retryable flag it was given.'},
+ {tag:'2.4', stem:'One developer wants to experiment with a new MCP server that only they use, without changing the shared team configuration or affecting any other teammate. Where does it belong?',
+  opts:['Project-scoped <code>.mcp.json</code>, committed to the repo','User-scoped <code>~/.claude.json</code>','A new branch dedicated to the experiment','It can\'t be done without team sign-off'],
+  correct:1, why:'User-scope MCP configuration is personal and local to that developer\'s machine -- exactly suited to a solo experiment that shouldn\'t touch the shared, version-controlled project config.'},
+ {tag:'2.5', stem:'An agent needs to find every file matching <code>*.config.ts</code> across a large monorepo, by filename pattern, not by looking at file contents. Which built-in tool fits?',
+  opts:['Grep','Glob','Read','Edit'],
+  correct:1, why:'Glob matches file paths/names by pattern. Grep searches file *contents* -- the wrong tool when the filename pattern itself is the whole query.'},
+
+ {tag:'3.2', stem:'A skill should be restricted to file-write operations only, to prevent it from ever running a destructive shell command by accident. Which SKILL.md frontmatter field controls this?',
+  opts:['<code>argument-hint</code>','<code>context</code>','<code>allowed-tools</code>','<code>model</code>'],
+  correct:2, why:'<code>allowed-tools</code> restricts exactly which tools are available while the skill runs -- the mechanism for exactly this kind of scoping.'},
+ {tag:'3.4', stem:'A developer is asked to "add comprehensive tests to a legacy codebase with no existing test infrastructure." Plan mode or direct execution?',
+  opts:['Direct execution -- just start writing test files','Plan mode -- map the codebase structure, identify high-impact areas, and build a prioritized plan before writing anything','Neither -- this should be scripted outside Claude Code entirely','Plan mode only if the codebase exceeds 100 files'],
+  correct:1, why:'This is exactly the open-ended, structure-unknown case plan mode exists for -- there\'s no predetermined scope to execute directly against yet.'},
+ {tag:'3.5', stem:'A PR review surfaces three small issues where fixing one changes what the correct fix for another looks like. Best approach?',
+  opts:['Fix them one at a time in separate messages, in any order','Address all three together in a single detailed message, since they interact','Only fix the first one and ignore the rest','Ask the user to pick which one matters most'],
+  correct:1, why:'Interacting issues need to be reasoned about together -- fixing them sequentially risks a fix for issue #1 invalidating the right fix for issue #2. Independent, non-interacting issues are the case where sequential iteration works fine.'},
+ {tag:'3.1', stem:'A repo already has an <code>AGENTS.md</code> written for a different coding agent. What\'s the recommended way to give Claude Code the same instructions without duplicating the content?',
+  opts:['Manually copy the content into a new CLAUDE.md and maintain both separately','Create a <code>CLAUDE.md</code> that does <code>@AGENTS.md</code> (or a symlink)','Rename AGENTS.md to CLAUDE.md','Claude Code reads AGENTS.md natively -- no action needed'],
+  correct:1, why:'Claude Code reads CLAUDE.md specifically, not AGENTS.md. An <code>@import</code> (or symlink) reuses the existing content without a second copy to keep in sync.'},
+
+ {tag:'4.2', stem:'Every few-shot example for an ambiguous classification prompt happens to show the answer "category A." In production, the model now over-applies category A to genuinely different cases. What\'s the fix?',
+  opts:['Remove the few-shot examples entirely','Include examples spanning the different possible outcomes, not just one, so the model generalizes the actual decision boundary','Add ten more examples, all still showing category A, for reinforcement','Switch to a larger model'],
+  correct:1, why:'Few-shot examples teach the *pattern* of reasoning, not just a memorized answer. Examples that only ever show one outcome teach the model to expect that outcome, not to distinguish cases.'},
+ {tag:'4.3', stem:'An extraction pipeline leaves <code>tool_choice</code> at <code>"auto"</code>, even though structured output is mandatory on every call. Occasionally the model replies in prose instead of calling the extraction tool. Fix?',
+  opts:['Add a stronger instruction asking it to always use the tool','Force it with <code>tool_choice: {"type": "tool", "name": "..."}</code> (or at minimum <code>"any"</code>) so a text-only reply becomes structurally impossible','Increase max_tokens','Retry the call until it happens to use the tool'],
+  correct:1, why:'"auto" always leaves text-only replies possible. When structured output is mandatory, forcing the tool (or requiring some tool call via "any") removes that possibility at the API level instead of hoping the model complies.'},
+ {tag:'4.4', stem:'A validation-retry loop keeps failing because extracted line items don\'t sum to the stated total, and each retry just repeats a generic "invalid output" message. Retries aren\'t improving results. Fix?',
+  opts:['Give up and route to human review immediately','Include the specific validation error -- which values didn\'t reconcile -- in the retry prompt, not a generic message','Increase the retry count','Switch to a different extraction schema'],
+  correct:1, why:'Retry-with-feedback only works if the feedback is specific enough to act on. A generic "invalid" message gives the model nothing to correct; the actual mismatched values do.'},
+ {tag:'4.5', stem:'A nightly batch job processed 5,000 documents; 40 failed because of a formatting issue that\'s now been fixed upstream. Most efficient way to reprocess?',
+  opts:['Resubmit the full 5,000-document batch overnight again','Resubmit only the 40 failed documents, identified by their <code>custom_id</code>','Switch those 40 to synchronous calls immediately','Wait until the next scheduled nightly run to include them automatically'],
+  correct:1, why:'<code>custom_id</code> exists precisely to correlate and isolate failures so only the failed subset needs resubmission -- reprocessing everything wastes the 4,960 that already succeeded.'},
+
+ {tag:'5.3', stem:'A coordinator receives an error from a subagent, isn\'t sure how to handle it, and silently returns an empty result marked as successful so the pipeline doesn\'t crash. What\'s wrong with this?',
+  opts:['Nothing -- keeping the pipeline running is always the right priority','It hides a real failure from downstream synthesis and reporting -- structured error context should propagate instead of being suppressed as a fake success','The subagent should have retried instead','This is only a problem if it happens more than once'],
+  correct:1, why:'Silently suppressing an error (marking it success) is one of the two anti-patterns the guide calls out directly -- alongside aborting the whole workflow on one failure. Both throw away information the coordinator needs to make a real decision.'},
+ {tag:'5.1', stem:'Across a long support conversation covering two separate issues, the agent\'s summary of issue #1 (a specific dollar amount and date) gets vaguer by the time it resolves issue #2. What\'s the fix?',
+  opts:['Ask the customer to repeat issue #1\'s details when needed','Extract and persist issue #1\'s structured facts (amount, date, order id) into a separate context layer, rather than relying on them surviving in prose history','Shorten the conversation by resolving only one issue at a time','Increase the context window size'],
+  correct:1, why:'This is the same persistent-facts pattern as the general context-management principle: pull exact values out into a structured, always-present block rather than trusting they survive summarization or a long history.'},
 ];
 
 /* =========================================================================
@@ -1795,12 +1873,156 @@ function renderT55(){
 }
 
 function renderQuiz(){
-  let html = '<h2>Full Practice Exam</h2><p class="dek">' + QUIZ.length + ' original, scenario-style questions '+
-  'across all 5 domains, weighted roughly the way the real blueprint weights them. Answer them cold — the '+
-  'summary at the top tells you exactly which task statements to revisit.</p>'+
+  let html = '<h2>Practice Quiz</h2><p class="dek">All ' + QUIZ.length + ' original, scenario-style questions, '+
+  'untimed, with the answer and explanation revealed as soon as you pick one — for learning, not simulating exam '+
+  'conditions. For that, use the Mock Exam instead.</p>'+
   '<div class="quiz-summary" id="quiz-summary"><div class="detail">Answer all ' + QUIZ.length + ' to see your score.</div></div>';
   QUIZ.forEach((q,i) => { html += quizCardHTML(q, 'full-'+i); });
   return html;
+}
+
+function renderMockExam(){
+  if (mockExam.phase === 'active') return renderMockExamActive();
+  if (mockExam.phase === 'results') return renderMockExamResults();
+  return renderMockExamIntro();
+}
+
+function renderMockExamIntro(){
+  return '<h2>Mock Exam</h2>'+
+  '<p class="dek">All '+QUIZ.length+' questions, one attempt, a real 120-minute countdown, and no answer '+
+  'revealed until you submit — the closest thing here to actual exam conditions. Scored on the real scale: '+
+  '100–1000, 720 to pass.</p>'+
+  '<div class="card"><h3 style="margin-top:0">Exactly how the real exam is weighted</h3>'+
+  '<table class="decision-table"><tr><th>Domain</th><th>Questions</th><th>Weight</th></tr>'+
+  '<tr><td>1 — Agentic Architecture &amp; Orchestration</td><td>16</td><td>27%</td></tr>'+
+  '<tr><td>2 — Tool Design &amp; MCP Integration</td><td>11</td><td>18%</td></tr>'+
+  '<tr><td>3 — Claude Code Configuration &amp; Workflows</td><td>12</td><td>20%</td></tr>'+
+  '<tr><td>4 — Prompt Engineering &amp; Structured Output</td><td>12</td><td>20%</td></tr>'+
+  '<tr><td>5 — Context Management &amp; Reliability</td><td>9</td><td>15%</td></tr>'+
+  '<tr><td><b>Total</b></td><td><b>60</b></td><td><b>100%</b></td></tr></table></div>'+
+  '<div class="note-inline"><b>Scoring note:</b> the real exam\'s 100–1000 scale is produced by an undisclosed '+
+  'psychometric model. This uses a straightforward linear approximation (100 + correct/60 × 900) so you get a '+
+  'directionally honest sense of where you stand — treat the pass/fail line as a strong signal, not an exact '+
+  'prediction of your real scaled score.</div>'+
+  '<div class="card" style="text-align:center;padding:32px;">'+
+  '<button class="run" style="font-size:13px;padding:14px 28px;" onclick="startMockExam()">&#9654; Start the 120-minute mock exam</button>'+
+  '<p style="font-size:12px;color:var(--ink-soft);margin-top:12px;">Once started, the timer runs even if you navigate away from this page.</p>'+
+  '</div>';
+}
+
+function renderMockExamActive(){
+  let html = '<div class="exam-timer"><div><span class="clock" id="exam-clock">120:00</span> '+
+    '<span class="meta">remaining</span></div>'+
+    '<div class="meta" id="exam-progress">0 / '+mockExam.questions.length+' answered</div>'+
+    '<button onclick="submitMockExam()">Submit now</button></div>';
+  mockExam.questions.forEach((q, i) => {
+    html += '<div class="exam-q unanswered" id="exam-q-'+i+'"><span class="qnum">Question '+(i+1)+' of '+mockExam.questions.length+' · Domain '+q.tag.split('.')[0]+'</span>'+
+      '<div class="qstem">'+q.stem+'</div>'+
+      q.opts.map((o, oi) => '<button class="exam-opt" onclick="selectMockAnswer('+i+','+oi+')">'+o+'</button>').join('')+
+      '</div>';
+  });
+  return html;
+}
+
+function renderMockExamResults(){
+  const total = mockExam.questions.length;
+  const correct = mockExam.questions.filter((q, i) => mockExam.answers[i] === q.correct).length;
+  const scaled = Math.round(100 + (correct / total) * 900);
+  const passed = scaled >= 720;
+  const byDomain = {};
+  mockExam.questions.forEach((q, i) => {
+    const d = q.tag.split('.')[0];
+    byDomain[d] = byDomain[d] || {correct: 0, total: 0};
+    byDomain[d].total++;
+    if (mockExam.answers[i] === q.correct) byDomain[d].correct++;
+  });
+  const domainNames = {1:'Agentic Architecture & Orchestration',2:'Tool Design & MCP Integration',
+    3:'Claude Code Configuration & Workflows',4:'Prompt Engineering & Structured Output',5:'Context Management & Reliability'};
+
+  let html = '<h2>Mock Exam Results</h2>'+
+    '<div class="result-banner '+(passed?'pass':'fail')+'">'+
+    '<div class="bigscore">'+scaled+'</div>'+
+    '<div><div style="font-weight:700;font-size:16px;">'+(passed?'PASS':'NOT YET')+' · 720 to pass</div>'+
+    '<div style="font-size:13px;color:var(--ink-soft);">'+correct+' / '+total+' correct ('+Math.round(100*correct/total)+'%)</div></div></div>'+
+    '<div class="card"><h3 style="margin-top:0">By domain</h3><table class="decision-table">'+
+    '<tr><th>Domain</th><th>Correct</th><th>%</th></tr>'+
+    Object.keys(byDomain).sort().map(d => {
+      const b = byDomain[d];
+      const pct = Math.round(100*b.correct/b.total);
+      return '<tr><td>'+domainNames[d]+'</td><td>'+b.correct+' / '+b.total+'</td><td>'+pct+'%</td></tr>';
+    }).join('')+
+    '</table></div>'+
+    '<div class="card" style="text-align:center;"><button class="run" onclick="resetMockExam()">Take it again</button></div>'+
+    '<h3>Review every question</h3>';
+  mockExam.questions.forEach((q, i) => {
+    const picked = mockExam.answers[i];
+    const wasCorrect = picked === q.correct;
+    html += '<div class="qcard"><span class="qtag">Question '+(i+1)+' · Task '+q.tag+' '+
+      '<span class="review-answer '+(wasCorrect?'correct':'wrong')+'">'+(wasCorrect?'correct':(picked === undefined ? 'not answered' : 'incorrect'))+'</span></span>'+
+      '<div class="qstem">'+q.stem+'</div>'+
+      q.opts.map((o, oi) => {
+        let cls = 'opt';
+        if (oi === q.correct) cls += ' correct';
+        else if (oi === picked) cls += ' wrong';
+        return '<div class="'+cls+'" style="cursor:default;">'+o+'</div>';
+      }).join('')+
+      '<div class="explain shown"><b>Why:</b> '+q.why+'</div></div>';
+  });
+  return html;
+}
+
+let mockExam = {phase: 'intro', questions: [], answers: {}, timeLeft: 0, timerHandle: null};
+
+function shuffleArray(arr){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startMockExam(){
+  mockExam.questions = shuffleArray(QUIZ);
+  mockExam.answers = {};
+  mockExam.phase = 'active';
+  mockExam.timeLeft = 120 * 60;
+  showSection('mockexam');
+  mockExam.timerHandle = setInterval(() => {
+    mockExam.timeLeft--;
+    updateExamClock();
+    if (mockExam.timeLeft <= 0) submitMockExam();
+  }, 1000);
+}
+
+function updateExamClock(){
+  const el = document.getElementById('exam-clock');
+  if (!el) return;
+  const m = Math.floor(mockExam.timeLeft / 60);
+  const s = mockExam.timeLeft % 60;
+  el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  el.classList.toggle('low', mockExam.timeLeft < 300);
+}
+
+function selectMockAnswer(qi, oi){
+  mockExam.answers[qi] = oi;
+  const card = document.getElementById('exam-q-'+qi);
+  card.classList.remove('unanswered');
+  card.querySelectorAll('.exam-opt').forEach((b, i) => b.classList.toggle('selected', i === oi));
+  const answered = Object.keys(mockExam.answers).length;
+  const progress = document.getElementById('exam-progress');
+  if (progress) progress.textContent = answered + ' / ' + mockExam.questions.length + ' answered';
+}
+
+function submitMockExam(){
+  if (mockExam.timerHandle) clearInterval(mockExam.timerHandle);
+  mockExam.phase = 'results';
+  showSection('mockexam');
+}
+
+function resetMockExam(){
+  mockExam = {phase: 'intro', questions: [], answers: {}, timeLeft: 0, timerHandle: null};
+  showSection('mockexam');
 }
 
 const RENDERERS = {
@@ -1810,7 +2032,7 @@ const RENDERERS = {
   t31: renderT31, t34: renderT34, t35: renderT35, t36: renderT36,
   t41: renderT41, t43: renderT43, t45: renderT45, t46: renderT46,
   t51: renderT51, t52: renderT52, t53: renderT53, t55: renderT55,
-  quiz: renderQuiz,
+  quiz: renderQuiz, mockexam: renderMockExam,
 };
 
 /* =========================================================================
