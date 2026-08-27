@@ -121,7 +121,10 @@
       font-size:12px;}
   .api-panel .remember{display:flex;align-items:center;gap:7px;margin-top:10px;font-size:12px;color:var(--ink-soft);}
   .api-panel .remember input{width:auto;}
-  .api-panel .hint{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;}
+  .api-panel .hint{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;word-break:break-word;}
+  .api-panel .hint.ok{color:var(--good);}
+  .api-panel .hint.err{color:var(--bad);}
+  .api-panel .testbtn{margin-top:8px;width:100%;}
   .api-panel .savebtn{margin-top:12px;width:100%;}
 
   /* live-run blocks */
@@ -214,9 +217,14 @@
       <input type="text" id="api-model" placeholder="claude-sonnet-5" value="claude-sonnet-5">
       <label class="remember"><input type="checkbox" id="api-remember"> Remember for this browser tab only</label>
       <button class="primary savebtn" onclick="saveApiSettings()">Connect</button>
-      <div class="hint">Sent directly from your browser to the API — never saved to a file, never sent anywhere
-      else. Nothing here gets committed to the repo. Clearing this field or closing the tab (unless you checked
-      "remember") erases it completely.</div>
+      <button class="testbtn" onclick="testApiConnection()">Test connection</button>
+      <div class="hint" id="api-test-result">Sent directly from your browser to the API — never saved to a file,
+      never sent anywhere else. Nothing here gets committed to the repo. Clearing this field or closing the tab
+      (unless you checked "remember") erases it completely. If "Test connection" fails and the message doesn't
+      point to an obvious fix, try serving this file from a tiny local server instead of opening it directly
+      (<code>python -m http.server</code> in this folder, then open <code>http://localhost:8000/app.html</code>)
+      — a few browsers restrict outbound requests from <code>file://</code> pages more than from
+      <code>http://</code> ones.</div>
     </div>
 
     <div class="progress-card">
@@ -313,31 +321,56 @@ function updateApiStatusUI(){
     : 'Not connected — click to add your key';
 }
 
+function resolveMessagesUrl(){
+  let base = (apiState.baseUrl || 'https://api.anthropic.com').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+  // Forgive a base URL that already includes the /v1/messages path --
+  // pasting the full endpoint (rather than just its host+prefix) is an
+  // easy, very common mistake.
+  base = base.replace(/\/v1\/messages$/i, '');
+  return base + '/v1/messages';
+}
+
 function friendlyError(e){
+  const url = resolveMessagesUrl();
   if (e.message === 'NO_KEY') return 'No API key set. Click "Live API" in the sidebar and paste yours in.';
-  if (e.status === 401) return 'Auth failed — the key was rejected. Double-check it in the Live API panel.';
+  if (e.status === 401) return 'Auth failed (401) at ' + url + ' — the key was rejected. Double-check it in the Live API panel.';
   if (e.status === 400 && /credit balance/i.test(e.message)) return 'This key has no credit balance. Add credits, then try again.';
-  if (e instanceof TypeError) return 'Network/CORS error reaching the API. If you set a custom base URL, confirm it allows direct browser access.';
+  if (e.status === 404) return '404 at ' + url + ' — the base URL is likely wrong. Check it against your provider\'s docs.';
+  if (e.status) return 'HTTP ' + e.status + ' at ' + url + ': ' + e.message;
+  if (e instanceof TypeError) {
+    return 'Could not reach ' + url + ' at all (browser blocked it before any response came back). ' +
+      'Most likely causes: (1) the base URL is wrong or unreachable -- open ' + url + ' directly in a new ' +
+      'tab to sanity-check it, (2) that endpoint does not allow direct browser access (missing/incorrect ' +
+      'CORS headers) -- ask your provider, (3) you\'re offline. Open DevTools > Network tab and re-run for ' +
+      'the exact reason the browser gives.';
+  }
   return e.message || String(e);
 }
 
 async function callClaude({messages, tools, tool_choice, system}){
   if (!apiState.apiKey) throw new Error('NO_KEY');
-  const base = (apiState.baseUrl || 'https://api.anthropic.com').replace(/\/$/, '');
+  const url = resolveMessagesUrl();
   const body = { model: apiState.model || 'claude-sonnet-5', max_tokens: 1024, messages };
   if (tools) body.tools = tools;
   if (tool_choice) body.tool_choice = tool_choice;
   if (system) body.system = system;
-  const resp = await fetch(base + '/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiState.apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify(body),
-  });
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiState.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (networkErr) {
+    console.error('callClaude: fetch to', url, 'failed before any response:', networkErr);
+    throw networkErr;
+  }
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok){
     const err = new Error((data && data.error && data.error.message) || resp.statusText);
@@ -345,6 +378,22 @@ async function callClaude({messages, tools, tool_choice, system}){
     throw err;
   }
   return data;
+}
+
+async function testApiConnection(){
+  const el = document.getElementById('api-test-result');
+  const url = resolveMessagesUrl();
+  el.textContent = 'Testing ' + url + ' …';
+  el.className = 'hint';
+  try {
+    const resp = await callClaude({messages: [{role: 'user', content: 'Reply with exactly: OK'}]});
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    el.textContent = '✔ Connected. Model replied: ' + text;
+    el.className = 'hint ok';
+  } catch (e) {
+    el.textContent = '✗ ' + friendlyError(e);
+    el.className = 'hint err';
+  }
 }
 
 function liveConsole(id){
