@@ -1870,6 +1870,29 @@ EOF`,
     tryIt: 'Run <code>/audit-dependencies</code> with no argument — Claude Code should prompt for <code>[package-name]</code> rather than guessing. Run it for real (needs a <code>package.json</code> — <code>npm init -y</code> first if you don\'t have one): notice the potentially long npm-audit output does not dump into your main conversation, because <code>context: fork</code> ran it in its own isolated sub-conversation. Try removing <code>allowed-tools</code> and re-running — the skill can now use whatever the main session can, including Edit, a materially less contained skill.',
   },
   {
+    title: 'Proving fork isolates exploration and output, not just tools',
+    body: 'Two versions of the same skill, IDENTICAL <code>allowed-tools</code> in both — the only difference is <code>context: fork</code>. This isolates the variable so you can see it is fork itself doing the isolating, not a tool restriction.',
+    code: `mkdir -p .claude/skills/explore-payments
+cat > .claude/skills/explore-payments/SKILL.md <<'EOF'
+---
+description: Explore the payments module and summarize how it works
+context: fork
+allowed-tools: Read, Grep
+---
+
+Read every file under src/payments/, grep for how each function is called
+elsewhere in the repo, and write a 150-word summary of how the module works.
+EOF
+
+# a few files worth exploring
+for f in charge.ts refund.ts webhook.ts reconcile.ts ledger.ts; do
+  cat > src/payments/$f <<EOF
+export function \${f%.ts}() { /* ... */ }
+EOF
+done`,
+    tryIt: 'Fresh session, run <code>/context</code> and note the token count. Run <code>/explore-payments</code>, wait for its summary, then run <code>/context</code> again — the increase should be small, roughly the size of the summary, NOT five files\' worth of reads plus grep output. Now copy the skill to <code>.claude/skills/explore-payments-noforkr/SKILL.md</code>, remove only the <code>context: fork</code> line (keep <code>allowed-tools: Read, Grep</code> identical), run <code>/context</code>, then <code>/explore-payments-noforkr</code>, then <code>/context</code> again — this time the jump should be much bigger, even though the skill\'s tool access never changed. Same tools, same task, same output requested — the only variable was <code>context: fork</code>, and it alone accounts for the difference.',
+  },
+  {
     title: 'Commit what belongs in version control',
     body: 'Confirm the personal files never show up.',
     code: `git add CLAUDE.md STYLE_GUIDE.md src/payments/CLAUDE.md \\
