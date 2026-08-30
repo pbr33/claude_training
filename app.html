@@ -2448,7 +2448,8 @@ function resetMockExam(){
 
 const MASTERPIECE_TOPICS = [
   {id: 'mp1', num: 'MP-1', title: 'Parallel tool calls within a single turn',
-   objective: 'Configure agentic loops to emit multiple tool calls within a single response turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.'},
+   objective: 'Configure agentic loops to emit multiple tool calls within a single response turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.',
+   domains: 'Domain 1 · Agentic Architecture & Orchestration (loop mechanics) + Domain 2 · Tool Design & MCP Integration (batching and result-handling for MCP tool calls)'},
   {id: 'mp2', num: 'MP-2', title: 'Session resumption: accurate state, no repeated work',
    objective: 'Apply session resumption techniques -- including targeted re-analysis of changed files and context injection -- to restore agent state accurately without repeating prior work.'},
 ];
@@ -2470,6 +2471,23 @@ const MASTERPIECE_QUIZ = [
      'The tool descriptions need <code>input_examples</code> added so Claude has clearer guidance on when each applies.',
    ], correct: 2,
    why: 'This is the single most common documented cause of parallel tool use quietly degrading over a session: message-history formatting is itself a signal the model reads back. A is a real phenomenon in general but the wrong diagnosis here, and trimming context wouldn\'t fix a formatting bug regardless. B doesn\'t touch formatting -- forcing <code>"any"</code> doesn\'t restore batching on its own. D improves how well Claude fills in a schema, not how many tools it decides to call in one turn.'},
+  {tag: 'mp1', stem: 'Your agent has four MCP tools: <code>get_customer</code>, <code>lookup_order</code>, <code>process_refund</code>, <code>escalate_to_human</code>. A customer messages: "I want a refund for order #4471 and I also want to update my email on file." Claude determines these are two independent sub-tasks and, in a single turn, issues two parallel tool calls: <code>lookup_order</code> (order #4471) and <code>get_customer</code> (to fetch the account for the email update). Your orchestration layer receives both results back from your backend at slightly different times -- the customer lookup resolves 200ms faster than the order lookup -- so your code appends each result to the conversation as soon as it arrives:'+
+    '<pre style="background:var(--card);border:1px solid var(--hair);border-radius:6px;padding:10px 12px;font-family:\'IBM Plex Mono\',monospace;font-size:12px;overflow-x:auto;margin:10px 0;line-height:1.5;"># result 1 arrives first\n'+
+    'messages.append({"role": "user", "content": [\n'+
+    '    {"type": "tool_result", "tool_use_id": "toolu_customer", "content": customer_data}\n'+
+    ']})\n'+
+    '# result 2 arrives 200ms later\n'+
+    'messages.append({"role": "user", "content": [\n'+
+    '    {"type": "tool_result", "tool_use_id": "toolu_order", "content": order_data}\n'+
+    ']})</pre>'+
+    'Over the following weeks, you notice the agent\'s first-contact resolution rate on multi-issue tickets (refund + something else) has dropped -- it now frequently handles the two parts of a request as separate turns instead of reasoning about both together, increasing escalations to <code>escalate_to_human</code> on tickets it used to resolve independently. What is the most likely architectural cause, and what\'s the correct fix?',
+   opts: [
+     '<code>get_customer</code> and <code>lookup_order</code> have overlapping permissions, causing the model to defer to <code>escalate_to_human</code> out of caution. Fix: scope each tool\'s permissions more narrowly.',
+     'The two <code>tool_result</code> blocks were appended as separate user messages because they arrived asynchronously at different times, instead of being buffered and sent as one user message once both were ready. This is teaching the model, from its own conversation history, that results come back one at a time -- degrading its tendency to reason about parallel sub-tasks jointly. Fix: buffer all tool results from a single parallel batch and append them together in one user message, in original call order, regardless of individual arrival latency.',
+     '<code>lookup_order</code> should be merged into <code>get_customer</code> as one combined tool, since they\'re both read operations on the same customer record.',
+     'The model has exceeded its context window on multi-issue tickets; fix by increasing <code>max_tokens</code>.',
+   ], correct: 1,
+   why: 'B is the real, and easy to miss, trap: nothing about async arrival latency requires appending results as soon as each one lands. The fix is to buffer -- wait until every call from that batch has resolved, then send one user message containing all of its <code>tool_result</code> blocks, in the same order the <code>tool_use</code> blocks were originally issued. Do that and 200ms of arrival skew never touches message formatting. Skip it, and the conversation history itself becomes training signal: every turn that shows results split across messages nudges the model toward treating multi-part requests as sequential rather than parallel, which is exactly the resolution-rate regression described. A invents a permissions mechanism that doesn\'t drive tool-choice behavior this way. C is a plausible-sounding tool-consolidation idea but doesn\'t explain a regression that appeared over time from a stable tool set. D is a red herring -- two small lookups on one ticket don\'t approach a context-window ceiling, and <code>max_tokens</code> caps output length, not the behavior described.'},
   {tag: 'mp2', stem: 'A team resumes a 3-day-old Claude Code session with <code>claude --resume backend-migration</code> to keep working on a large refactor. Two teammates pushed several commits to the same branch since the session last ran, and the engineer wants Claude to account for those changes before continuing -- without spending a full turn re-reading the entire codebase from scratch. What\'s the most effective way to do this?',
    opts: [
      'Rely on <code>claude --resume</code> alone -- resuming already restores the full conversation history, so no additional step is needed.',
@@ -2494,6 +2512,33 @@ function mpQuizMini(tag){
   let html = '<h3>Check yourself</h3>';
   items.forEach((q, i) => { html += quizCardHTML(q, tag+'-mp-'+i); });
   return html;
+}
+
+function mpShoppingDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:130px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Correct -- one bag, one handoff', [
+      box('"get milk<br>AND bread"'), box('shopper gets<br>both items', ['milk', 'bread']),
+      box('one bag,<br>handed over once'), box('you: got both,<br>trust the pattern'),
+    ], 'Two things asked for together, delivered together -- matches the request', true)+
+    row('Still gets the items -- but two separate handoffs', [
+      box('"get milk<br>AND bread"'), box('shopper gets<br>both items', ['milk', 'bread']),
+      box('trip 1: milk<br>handed over alone'), box('trip 2: bread<br>handed over later, alone'),
+    ], 'Nothing breaks THIS time -- but the shopper now reads "one thing per trip" as the expected pattern', false)+
+  '</div>';
 }
 
 function mpParallelDiagramHTML(){
@@ -2604,12 +2649,29 @@ const CODE_MP1 = `// Multiple tool_use blocks in ONE assistant turn (stop_reason
 "tool_choice": {"type": "auto", "disable_parallel_tool_use": true}  // -> at most 1 tool call
 "tool_choice": {"type": "any",  "disable_parallel_tool_use": true}  // -> exactly 1 tool call`;
 
+const CODE_MP1_SHOPPING = `# WRONG -- two trips, even if each result is correct on its own
+messages.append({"role": "user", "content": [
+    {"type": "tool_result", "tool_use_id": "toolu_01", "content": weather_data}
+]})
+messages.append({"role": "user", "content": [
+    {"type": "tool_result", "tool_use_id": "toolu_02", "content": traffic_data}
+]})
+
+# RIGHT -- one bag, handed over once. Build one list containing both
+# tool_result blocks, in the order the tools were originally called,
+# then append that list a single time.
+messages.append({"role": "user", "content": [
+    {"type": "tool_result", "tool_use_id": "toolu_01", "content": weather_data},
+    {"type": "tool_result", "tool_use_id": "toolu_02", "content": traffic_data}
+]})`;
+
 function renderMasterpieceHub(){
   const cards = MASTERPIECE_TOPICS.map(t =>
     '<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showSection(\''+t.id+'\')">'+
     '<span class="pill">'+t.num+'</span>'+
     '<h3 style="margin:8px 0 4px;">'+t.title+'</h3>'+
     '<p style="font-size:13px;color:var(--ink-soft);margin:0;">'+t.objective+'</p>'+
+    (t.domains ? '<p style="font-size:11.5px;color:var(--accent);margin:8px 0 0;">'+t.domains+'</p>' : '')+
     '</div>'
   ).join('');
   return '<h2>Masterpiece</h2>'+
@@ -2624,6 +2686,10 @@ function renderMP1(){
   '<h2>Parallel tool calls within a single turn</h2>'+
   '<p class="dek">Objective: configure agentic loops to emit multiple tool calls within a single response '+
   'turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.</p>'+
+  '<p style="font-size:12px;color:var(--accent);margin:-6px 0 18px;">Spans Domain 1 · Agentic Architecture '+
+  '&amp; Orchestration (the loop mechanics -- <code>stop_reason</code>, multiple <code>tool_use</code> blocks) '+
+  'and Domain 2 · Tool Design &amp; MCP Integration (batching and result-handling once those calls target '+
+  'real MCP tools).</p>'+
   '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
   '<li>Claude may return multiple <code>tool_use</code> blocks in one assistant turn (<code>stop_reason: "tool_use"</code>) when it identifies multiple independent operations -- Claude 4+ models do this by default when a request benefits from it</li>'+
   '<li>The API does not prescribe execution order for a batch of calls -- that\'s the client\'s decision. Run independent, read-only calls concurrently for latency; run calls with side effects or ordering dependencies sequentially, stopping at the first failure if one occurs</li>'+
@@ -2637,6 +2703,35 @@ function renderMP1(){
   '<li>Return <code>is_error: true</code> with a short explanation for any call in the batch you chose not to run, rather than omitting its <code>tool_result</code> -- every <code>tool_use</code> block needs a matching result</li>'+
   '<li>If parallel calls degrade over a session, check message-history formatting first, before touching prompts or <code>tool_choice</code></li>'+
   '<li>To push harder for parallel batching, add explicit system-prompt wording (Anthropic\'s docs show a stronger <code>&lt;use_parallel_tool_calls&gt;</code> block for this); to stop Claude bundling calls that actually depend on each other, add "Only batch tool calls that are independent of each other."</li></ul></div>'+
+  '<h3>Simpler version: a shopping list</h3>'+
+  '<div class="card" style="padding:16px 18px;">'+
+  '<p>Imagine you send someone to the store with a list: <i>"get milk AND get bread."</i> That\'s Claude '+
+  'calling two tools at once -- it\'s asking two things in parallel.</p>'+
+  '<p>The person comes back with <b>one bag</b> containing both milk and bread, and hands it to you all at '+
+  'once. That\'s the correct way: one message, both results together.</p>'+
+  '<p>Now imagine instead they come back <b>twice</b> -- first trip: just the milk, handed over separately. '+
+  'Second trip, a bit later: just the bread, handed over separately. Same items, same person, but delivered '+
+  'as two separate handoffs instead of one bag.</p>'+
+  '<p>Nothing "breaks" in the moment. You still end up with milk and bread. But here\'s the part that '+
+  'matters: <b>all your past interactions with this person are what they use to guess how you like things '+
+  'done going forward.</b> If every time you send them for two things, they hand items back one at a time '+
+  'in separate trips, they start assuming: "Ah, I guess this person wants me to always split deliveries into '+
+  'separate trips." So next time, even if it\'d be way more efficient to grab three things at once and bring '+
+  'them back together, they hesitate and start doing one-thing-per-trip instead -- because that\'s the '+
+  'pattern they\'ve seen rewarded and expected in the history.</p>'+
+  '</div>'+
+  mpShoppingDiagramHTML()+
+  '<div class="note-inline"><b>Mapping it back to the code:</b><ul style="margin:8px 0 0;padding-left:20px;">'+
+  '<li>Two tool calls in one turn = "get milk and get bread" -- two things requested together</li>'+
+  '<li>One user message with both <code>tool_result</code> blocks = one bag, handed over once, correctly</li>'+
+  '<li>Two separate user messages, one result each = two separate trips for items that should\'ve come back together</li></ul>'+
+  'The fix in the code is just: don\'t call <code>messages.append()</code> twice for the two results. Build '+
+  'one list containing both <code>tool_result</code> blocks, and append that list once.</div>'+
+  '<div class="card" style="margin-top:14px;">'+cliCardHTML({
+    title: 'The fix, in plain code',
+    body: 'Same fix as the JSON shape further down -- shown here as the minimal Python diff.',
+    code: CODE_MP1_SHOPPING,
+  })+'</div>'+
   '<h3>Sequential vs. parallel, side by side</h3>'+mpParallelDiagramHTML()+
   '<h3>Run it for real</h3>'+liveRunHTML({
     title: 'One turn, two independent tools, one round trip -- live.',
