@@ -311,6 +311,7 @@ const SECTIONS = [
   {id:'mp-hub', num:'', label:'Overview', group:'Masterpiece — Custom Deep Dives'},
   {id:'mp1', num:'MP-1', label:'Parallel Tool Calls', group:'mp'},
   {id:'mp2', num:'MP-2', label:'Session Resumption', group:'mp'},
+  {id:'mp3', num:'MP-3', label:'Subagent Prompts', group:'mp'},
 ];
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -2453,6 +2454,9 @@ const MASTERPIECE_TOPICS = [
   {id: 'mp2', num: 'MP-2', title: 'Session resumption: accurate state, no repeated work',
    objective: 'Apply session resumption techniques -- including targeted re-analysis of changed files and context injection -- to restore agent state accurately without repeating prior work.',
    domains: 'Domain 1 · Agentic Architecture & Orchestration (task 1.7 -- session state, resumption, forking) + Domain 3 · Claude Code Configuration & Workflows (--resume/--continue flags, SessionStart hooks, settings files)'},
+  {id: 'mp3', num: 'MP-3', title: 'Self-sufficient subagent prompts',
+   objective: 'Construct subagent prompts that include all findings, structured data, and source metadata required for task completion without returning to the coordinator for missing context.',
+   domains: 'Domain 1 · Agentic Architecture & Orchestration (tasks 1.2/1.3 -- coordinator-subagent orchestration, context passing)'},
 ];
 
 const MASTERPIECE_QUIZ = [
@@ -2513,6 +2517,22 @@ const MASTERPIECE_QUIZ = [
      'Run <code>claude --resume checkout-refactor --fork-session</code>, since forking automatically re-verifies every file the old conversation referenced before letting you continue.',
    ], correct: 2,
    why: 'C is correct because the diff that actually matters here isn\'t "everything that changed since you paused," it\'s "did anything change in the specific area this session cares about." Scoping the re-check to the refactor\'s own files (a targeted <code>git log</code> or <code>git diff</code> against just that path) answers the real question in seconds, whether or not the other 195+ files are relevant. A is the blind-trust failure mode: two of the changed files DO overlap the paused work, so skipping any check risks building on assumptions the merge already broke. B overcorrects -- the task hasn\'t changed, and most of that 200-file diff is unrelated noise to this session specifically; discarding the accumulated refactor plan and decisions throws away exactly the history that\'s still valuable, matching the documented "kitchen sink" logic backwards; the SESSION isn\'t cluttered, the merge is just large elsewhere. D misdescribes what <code>--fork-session</code> actually does -- it copies the existing transcript into a new session ID, nothing more; it performs no verification of any kind on its own.'},
+  {tag: 'mp3', stem: 'A coordinator dispatches a subagent with the prompt: "Check whether the payment retry logic handles idempotency correctly and report back." The coordinator has already spent several turns reading <code>payment_service.py</code>, found the exact function (<code>process_retry</code> at line 142), and confirmed via a support ticket that the bug reproduces specifically when a customer\'s card is declined then retried within 2 seconds. None of that made it into the subagent\'s prompt. What\'s the most likely outcome, and why?',
+   opts: [
+     'The subagent automatically receives the coordinator\'s full conversation history, so it already knows about <code>payment_service.py</code>, <code>process_retry</code>, and the 2-second reproduction window -- no issue.',
+     'The subagent starts with a fresh, isolated context containing only its own system prompt and this one prompt string. With no file path, function name, or reproduction condition given, it has to independently rediscover all of that (burning tool calls) or guess -- and the coordinator likely has to re-invoke it with the missing specifics once it sees an incomplete result.',
+     'The subagent will pause execution and send a message back to the coordinator asking for the missing file path and reproduction steps before continuing.',
+     'Because the subagent automatically inherits the coordinator\'s loaded skills and CLAUDE.md, it will infer the exact function and reproduction condition from project context.',
+   ], correct: 1,
+   why: 'This matches the documented architecture exactly: "the only content you pass from parent to subagent is the Agent tool\'s prompt string" -- a non-fork subagent\'s context starts fresh, with no parent conversation history or tool results. A is the core misconception this objective exists to correct. C invents a mid-task callback that isn\'t part of the default architecture -- a subagent with the <code>SendMessage</code> tool can message other named agents, but that\'s a narrow, opt-in capability this subagent wasn\'t given, not a general "ask the coordinator" channel. D conflates two different things: project CLAUDE.md may load, but preloaded skills specifically are documented as NOT inherited unless listed in the agent\'s definition, and neither CLAUDE.md nor skills would contain an investigation-specific finding like a line number or a support-ticket reproduction window -- that only exists in the coordinator\'s own conversation, which doesn\'t cross over.'},
+  {tag: 'mp3', stem: 'Three subagents are investigating a shared root-cause analysis across three services. Subagent 1 discovers that a rate limiter config value was changed in a deploy 6 hours ago (found in <code>deploy_log.txt</code>, timestamp included). The coordinator now wants to dispatch Subagent 2 to check whether that same config change explains elevated latency in a downstream billing service it hasn\'t looked at yet. Which prompt construction is most likely to let Subagent 2 complete the task correctly on the first attempt?',
+   opts: [
+     '"Investigate whether the recent rate limiter change affected the billing service\'s latency." -- trusting Subagent 2 to look up the specific change itself.',
+     'A prompt that states the exact config change (old value to new value), the deploy timestamp, explicitly labels it "from deploy_log.txt via Subagent 1, confirmed," names the billing service and the specific metric/threshold to check it against, and instructs Subagent 2 to report findings using only this plus whatever it discovers in the billing service\'s own logs.',
+     'A prompt telling Subagent 2 to "coordinate with Subagent 1 directly to get the details," assuming subagents can message each other by default.',
+     'A prompt that pastes the coordinator\'s entire conversation transcript so far, on the theory that more context always produces a more accurate result.',
+   ], correct: 1,
+   why: 'B matches the requirement precisely: everything Subagent 2 needs -- the specific change, its value and timestamp, and its source and confidence -- is stated explicitly and labeled, and the task is scoped to exactly what to check it against. A repeats the underspecified-prompt mistake from the previous question, just with a different task. C assumes default inter-subagent messaging that doesn\'t exist unless both agents are explicitly given the <code>SendMessage</code> tool -- that\'s the exception, not the default architecture. D is a real anti-pattern in its own right: dumping the full transcript into a fresh, isolated context defeats the isolation benefit that makes subagents useful, buries the one fact that actually matters in irrelevant noise, and costs more tokens for a worse result than a short, labeled excerpt.'},
 ];
 
 function mpQuizMini(tag){
@@ -2861,6 +2881,112 @@ const HOOK_MP2 = `// .claude/settings.json -- fires only when a saved session is
 // swap in; "resume" is the same mechanism applied to picking a session
 // back up instead of surviving a compaction.`;
 
+function mpNoSignalDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:135px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Sent off with a vague ask', [
+      box('"go check<br>it out"'), box('they leave --<br>no signal where<br>they\'re going'),
+      box('arrives, missing<br>budget / contact /<br>exact address'), box('guesses, or the<br>trip comes back<br>incomplete'),
+    ], 'No way to call and ask -- a second trip is needed to fix what the first one lacked', false)+
+    row('Sent off with a written packet', [
+      box('address + budget +<br>contact, each labeled<br>where it came from'), box('they leave --<br>no signal where<br>they\'re going'),
+      box('everything needed<br>is already in hand'), box('job done,<br>one trip'),
+    ], 'Nothing to call back and ask -- there was never a line to call back on', true)+
+  '</div>';
+}
+
+function mpSubagentPromptDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:145px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Underspecified Agent tool prompt', [
+      box('coordinator has:<br>file path, error,<br>root-cause note'), box('Agent tool prompt:<br>task only'),
+      box('subagent: fresh,<br>isolated context,<br>none of that'), box('guesses / re-derives /<br>incomplete result'),
+      box('coordinator re-invokes<br>Agent with the<br>missing specifics'),
+    ], 'A second Agent tool call is needed -- exactly the round trip this objective exists to avoid', false)+
+    row('Self-sufficient Agent tool prompt', [
+      box('coordinator has:<br>file path, error,<br>root-cause note'), box('Agent tool prompt:<br>task + findings +<br>source tags, inline'),
+      box('subagent: fresh,<br>isolated context,<br>but has everything'), box('completes correctly,<br>first call'),
+    ], 'One Agent tool call -- no missing-context round trip', true)+
+  '</div>';
+}
+
+const CODE_MP3 = `# WRONG -- the coordinator already knows all of this, but none of it
+# crosses into the subagent automatically. Only the Agent tool's
+# prompt string for THIS call does.
+agent_prompt = "Check whether the payment retry logic handles idempotency correctly and report back."
+
+# RIGHT -- every finding, structured, each one labeled with where it
+# came from and how confident to be in it. Nothing the subagent needs
+# is left for it to rediscover or guess.
+agent_prompt = """
+Task: verify whether process_retry() handles idempotency correctly for
+declined-then-retried payments, and recommend a fix if not.
+
+Findings already gathered -- use these, don't re-derive them:
+- File: payment_service.py, function process_retry(), line 142
+  (source: coordinator's own file read, this session)
+- Reproduction condition: bug reproduces when a customer's card is
+  declined then retried within 2 seconds
+  (source: support ticket #4471, confirmed)
+
+Report your finding using only the above plus what you verify by
+reading process_retry() yourself. If you rely on anything not stated
+here, say so explicitly.
+"""`;
+
+const FINDINGS_MP3_BLOCK = 'Use ONLY the information below -- do not assume access to the codebase, logs, or '+
+  'ticket system beyond what is given here. If something is unconfirmed, say so explicitly and attribute it to '+
+  'where it came from.\n\n'+
+  '- Error (source: prod logs, 2026-08-30 14:02 UTC): "ERR_TOKEN_EXPIRED at auth/session.js:88, user_id=8831, retry_count=3"\n'+
+  '- Triage note (source: incident channel, UNCONFIRMED): suspected refresh-token race condition\n'+
+  '- File already identified as relevant: src/auth/session.js';
+
+function buildMP3Prompt(complete){
+  const task = 'Investigate the login bug and report the root cause and a recommended fix.';
+  return complete ? (task + '\n\n' + FINDINGS_MP3_BLOCK) : task;
+}
+
+async function runSubagentPromptLive(complete, out){
+  out.clear();
+  const prompt = buildMP3Prompt(complete);
+  out.log('> ' + (complete ? '[complete, sourced prompt]' : '[vague prompt -- coordinator\'s findings left out]'), 'meta');
+  out.log(prompt);
+  out.log('');
+  out.log('… calling Claude as an isolated subagent (fresh call, no shared history)');
+  try {
+    const resp = await callClaude({messages: [{role: 'user', content: prompt}]});
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    out.log('');
+    out.log(text, complete ? 'ok' : undefined);
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
 function renderMP2(){
   return '<div class="taghead"><span class="pill">Masterpiece · MP-2</span></div>'+
   '<h2>Session resumption: restoring state accurately without repeating work</h2>'+
@@ -2959,6 +3085,68 @@ function renderMP2(){
   mpQuizMini('mp2');
 }
 
+function renderMP3(){
+  return '<div class="taghead"><span class="pill">Masterpiece · MP-3</span></div>'+
+  '<h2>Self-sufficient subagent prompts</h2>'+
+  '<p class="dek">Objective: construct subagent prompts that include all findings, structured data, and '+
+  'source metadata required for task completion without returning to the coordinator for missing context.</p>'+
+  '<p style="font-size:12px;color:var(--accent);margin:-6px 0 18px;">Domain 1 · Agentic Architecture &amp; '+
+  'Orchestration (tasks 1.2/1.3 -- coordinator-subagent orchestration, context passing).</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Unless a subagent is a fork, its context window starts fresh -- no parent conversation history, no parent tool results. The only content that crosses from coordinator to subagent is the Agent tool\'s prompt string for that specific call. Documented word for word: "include any file paths, error messages, or decisions the subagent needs directly in that prompt"</li>'+
+  '<li>A subagent\'s context <i>does</i> include its own <code>AgentDefinition.prompt</code> (a static system prompt/persona, set once when the subagent type is defined) and project CLAUDE.md if configured -- but <b>not</b> the coordinator\'s system prompt, and <b>not</b> preloaded skill content unless explicitly listed in <code>AgentDefinition.skills</code></li>'+
+  '<li>There is no default mid-task channel for a subagent to ask the coordinator a clarifying question. A subagent with the <code>SendMessage</code> tool can message other named agents in the session -- but that\'s a narrow, opt-in capability, not a general callback, and it\'s absent unless explicitly granted</li>'+
+  '<li>When a subagent\'s prompt is missing something it needs, the realistic outcomes are: it guesses or hedges, it burns tool calls independently rediscovering information the coordinator already had, or the coordinator has to re-invoke the Agent tool a second time with the missing specifics added -- the exact round trip this objective exists to avoid</li>'+
+  '<li>A subagent can be resumed later with its full history intact (capture its <code>agentId</code> and the session ID, then issue a new query with <code>resume</code>) -- but that\'s a deliberate follow-up call made after the fact, not the subagent asking mid-task, and it still costs a second round trip if the first prompt should have included the answer</li>'+
+  '<li>Only the subagent\'s final message returns to the coordinator, and the parent may summarize it further before the user ever sees it -- so labeling provenance in the subagent\'s own output matters too, if that attribution needs to survive into the coordinator\'s synthesis</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Inline every finding, file path, decision, and constraint the subagent needs directly into the Agent tool\'s prompt string -- treat "the coordinator already knows this" as equivalent to "the subagent doesn\'t," since nothing crosses automatically</li>'+
+  '<li>Tag each piece of information with where it came from and how confident to be in it (a verified file read vs. an unconfirmed ticket note) -- separating content from provenance so a subagent can flag rather than silently trust shaky input</li>'+
+  '<li>Give structured data as a labeled list, not one dense paragraph -- structure is retrieval, not decoration, here</li>'+
+  '<li>State explicitly what <i>not</i> to assume ("use only the information given," "don\'t assume access to X") -- this heads off both under- and over-confident guessing</li>'+
+  '<li>Don\'t over-correct into pasting the full coordinator transcript -- that defeats the isolation benefit subagents exist for and buries the one fact that matters in noise; a short, labeled excerpt beats the raw history</li></ul></div>'+
+  '<h3>Simpler version: sending someone on a trip with no phone signal</h3>'+
+  '<div class="card" style="padding:16px 18px;">'+
+  '<p>You\'re sending a colleague somewhere to handle something you can\'t go along for -- and once they '+
+  'leave, there\'s no signal. No calls, no texts, nothing, until they get back and report in.</p>'+
+  '<p>Whatever you tell them before they walk out the door is <b>all</b> they will have. If you forgot to '+
+  'mention the budget ceiling, who to ask for, or the exact address -- they can\'t call and ask. They\'ll '+
+  'either guess, waste the trip trying to re-derive it themselves, or come back with incomplete work, and '+
+  'you\'ll have to send them out again with the thing you forgot the first time.</p>'+
+  '<p>The fix isn\'t "hope they figure it out" or "explain everything you\'ve ever known about the project." '+
+  'It\'s handing them a short, specific packet before they leave: the exact facts they need, and where each '+
+  'one came from -- so they know what\'s solid and what to double-check on-site.</p>'+
+  '</div>'+
+  mpNoSignalDiagramHTML()+
+  '<div class="note-inline"><b>Mapping it back to the code:</b> "no phone signal" is the documented fact that '+
+  'a non-fork subagent\'s context starts fresh with no parent history. The "written packet" is the Agent '+
+  'tool\'s <code>prompt</code> string -- the only thing that actually crosses over. "Where each fact came '+
+  'from" is source metadata: label findings by origin (a file you read yourself vs. an unconfirmed report) so '+
+  'the subagent knows how much weight to give each one.</div>'+
+  '<h3>Underspecified vs. self-sufficient, side by side</h3>'+mpSubagentPromptDiagramHTML()+
+  '<h3>Run it for real</h3>'+liveRunHTML({
+    title: 'Same task, two prompts -- live, side by side.',
+    body: 'One subagent-style call gets only the task. The other gets the same task plus the coordinator\'s '+
+      'actual findings, each one labeled by source. Both are genuinely isolated calls -- no shared history, '+
+      'exactly how a real subagent starts.',
+    controlsHTML: '<button class="run" id="mp3-vague">&#9654; Run vague prompt</button>'+
+      '<button class="run" id="mp3-complete">&#9654; Run complete, sourced prompt</button>',
+    consoleId: 'mp3-console',
+  })+
+  '<h3>Constructing the prompt</h3>'+
+  '<div class="card">'+cliCardHTML({
+    title: 'The Agent tool\'s prompt string -- underspecified vs. self-sufficient',
+    body: 'Same subagent, same task, same AgentDefinition -- the only thing that changes is what goes into this one string, because it\'s the only thing that crosses over.',
+    code: CODE_MP3,
+  })+'</div>'+
+  '<div class="note-inline"><b>Source-checked:</b> the "what subagents inherit" table (system prompt, Agent '+
+  'tool prompt, CLAUDE.md, and tool definitions in; parent history, parent tool results, parent system prompt, '+
+  'and unlisted skills out), the absence of a default mid-task callback channel, the <code>SendMessage</code> '+
+  'tool\'s narrow scope, and subagent resumption via <code>agentId</code> + session ID are verified against '+
+  'Anthropic\'s current Claude Agent SDK documentation, not recalled from memory.</div>'+
+  mpQuizMini('mp3');
+}
+
 const RENDERERS = {
   overview: renderOverview, t11: renderT11, t12: renderT12, t14: renderT14,
   t16: renderT16, t17: renderT17, capstones: renderCapstones,
@@ -2967,7 +3155,7 @@ const RENDERERS = {
   t41: renderT41, t43: renderT43, t45: renderT45, t46: renderT46,
   t51: renderT51, t52: renderT52, t53: renderT53, t55: renderT55,
   quiz: renderQuiz, mockexam: renderMockExam,
-  'mp-hub': renderMasterpieceHub, mp1: renderMP1, mp2: renderMP2,
+  'mp-hub': renderMasterpieceHub, mp1: renderMP1, mp2: renderMP2, mp3: renderMP3,
 };
 
 /* =========================================================================
@@ -3635,6 +3823,11 @@ function attachLiveRunners(id){
   }
   if (id === 'mp1'){
     document.getElementById('mp1-run').onclick = runBtnGuard('mp1-run', () => runParallelToolsLive(liveConsole('mp1-console')));
+  }
+  if (id === 'mp3'){
+    const out = () => liveConsole('mp3-console');
+    document.getElementById('mp3-vague').onclick = runBtnGuard('mp3-vague', () => runSubagentPromptLive(false, out()));
+    document.getElementById('mp3-complete').onclick = runBtnGuard('mp3-complete', () => runSubagentPromptLive(true, out()));
   }
 }
 
