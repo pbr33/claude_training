@@ -307,6 +307,9 @@ const SECTIONS = [
 
   {id:'quiz', num:'', label:'Practice Quiz (untimed)', group:null},
   {id:'mockexam', num:'', label:'Mock Exam (60, timed)', group:null},
+
+  {id:'mp-hub', num:'', label:'Overview', group:'Masterpiece — Custom Deep Dives'},
+  {id:'mp1', num:'MP-1', label:'Parallel Tool Calls', group:'mp'},
 ];
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1080,7 +1083,7 @@ const QUIZ = [
 const nav = document.getElementById('nav');
 let lastGroupHeader = null;
 SECTIONS.forEach(s => {
-  if (s.group && s.group !== 'd1' && s.group !== 'd2' && s.group !== 'd3' && s.group !== 'd4' && s.group !== 'd5' && s.group !== lastGroupHeader){
+  if (s.group && s.group !== 'd1' && s.group !== 'd2' && s.group !== 'd3' && s.group !== 'd4' && s.group !== 'd5' && s.group !== 'mp' && s.group !== lastGroupHeader){
     const label = document.createElement('div');
     label.className = 'navgroup-label';
     label.style.marginTop = '10px';
@@ -2433,6 +2436,205 @@ function resetMockExam(){
   showSection('mockexam');
 }
 
+/* =========================================================================
+   MASTERPIECE -- custom deep-dive topics, fed in one at a time.
+   Separate from QUIZ/DOMAIN_TARGET_COUNTS on purpose: these track whatever
+   topic is requested next, not the official 5-domain blueprint, so they
+   never skew Mock Exam scoring or the official Practice Quiz. Each topic
+   gets: a grounded concept card, an original diagram, a genuinely live
+   "Run it for real" demo, and exam-format scenario questions.
+   ========================================================================= */
+
+const MASTERPIECE_TOPICS = [
+  {id: 'mp1', num: 'MP-1', title: 'Parallel tool calls within a single turn',
+   objective: 'Configure agentic loops to emit multiple tool calls within a single response turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.'},
+];
+
+const MASTERPIECE_QUIZ = [
+  {tag: 'mp1', stem: 'An agent needs <code>check_inventory</code> and <code>check_shipping</code> for the same order before answering the customer. Production traces show two separate request/response round trips -- the agent calls <code>check_inventory</code>, waits for the <code>tool_result</code>, gets a response, then calls <code>check_shipping</code> in a second turn. Both lookups are independent and read-only. What\'s the most effective first step to cut this to a single round trip?',
+   opts: [
+     'Set <code>tool_choice</code> to <code>{"type": "any", "disable_parallel_tool_use": true}</code> so Claude is required to call a tool immediately instead of responding with text first.',
+     'Restructure the client code to ask about both in a single user turn with both tools available in that request, so Claude can return both <code>tool_use</code> blocks together; execute both concurrently and return both <code>tool_result</code>s in one following message.',
+     'Raise <code>max_tokens</code> so Claude has enough output budget to emit two <code>tool_use</code> blocks instead of one.',
+     'Split the work across two subagents, one per lookup, coordinated by a parent orchestrator loop.',
+   ], correct: 1,
+   why: 'Multi-<code>tool_use</code> responses only happen when the request gives Claude one turn containing every independent thing it needs to resolve -- nothing else here changes that. Option A is backwards: <code>disable_parallel_tool_use</code> forces <b>exactly one</b> tool call under <code>type: "any"</code>, the opposite of the goal -- a classic exam trap testing whether you read the flag\'s actual effect rather than its name. C is a non-issue: two small <code>tool_use</code> blocks cost a sliver of a typical token budget; that was never the limiter. D works but is strictly heavier -- full subagent orchestration (isolated context, a coordinator, a synthesis step) for two independent, stateless reads that native parallel tool use inside one turn already solves for free.'},
+  {tag: 'mp1', stem: 'After enabling parallel tool calls, an engineer notices Claude reliably returns two <code>tool_use</code> blocks on the first turn of a session, but by the third or fourth turn it has quietly reverted to calling one tool at a time. The message history shows each assistant turn with two <code>tool_use</code> blocks is followed by <b>two separate</b> user messages, each carrying a single <code>tool_result</code>. What\'s actually going wrong, and what fixes it?',
+   opts: [
+     'The context window is filling up, crowding out the instruction to parallelize -- summarize or trim earlier turns.',
+     '<code>tool_choice</code> needs to be set to <code>"any"</code> instead of <code>"auto"</code> so Claude is forced to keep using multiple tools.',
+     'Splitting the two <code>tool_result</code>s into two separate user messages -- instead of one message containing both -- teaches the model, from its own conversation history, to stop batching; the fix is to merge every <code>tool_result</code> for a turn into a single following user message, in the same order as the <code>tool_use</code> blocks.',
+     'The tool descriptions need <code>input_examples</code> added so Claude has clearer guidance on when each applies.',
+   ], correct: 2,
+   why: 'This is the single most common documented cause of parallel tool use quietly degrading over a session: message-history formatting is itself a signal the model reads back. A is a real phenomenon in general but the wrong diagnosis here, and trimming context wouldn\'t fix a formatting bug regardless. B doesn\'t touch formatting -- forcing <code>"any"</code> doesn\'t restore batching on its own. D improves how well Claude fills in a schema, not how many tools it decides to call in one turn.'},
+];
+
+function mpQuizMini(tag){
+  const items = MASTERPIECE_QUIZ.filter(q => q.tag === tag);
+  if (!items.length) return '';
+  let html = '<h3>Check yourself</h3>';
+  items.forEach((q, i) => { html += quizCardHTML(q, tag+'-mp-'+i); });
+  return html;
+}
+
+function mpParallelDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:140px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Sequential -- one lookup per turn', [
+      box('Turn 1<br>ask about A'), box('tool_use A'), box('Turn 2<br>ask about B'),
+      box('tool_use B'), box('Turn 3<br>ask about C'), box('tool_use C'), box('Turn 4<br>final answer'),
+    ], '4 request/response round trips before the customer gets an answer', false)+
+    row('Parallel -- one turn, three tool_use blocks', [
+      box('Turn 1<br>ask about A, B, C', ['tool_use A', 'tool_use B', 'tool_use C']),
+      box('execute concurrently'), box('Turn 2<br>ALL 3 tool_results,<br>one message'), box('final answer'),
+    ], '2 round trips total, and the tool execution itself overlaps in wall-clock time', true)+
+  '</div>';
+}
+
+const STOCK_TOOL_JS = {
+  name: 'check_stock',
+  description: 'Check current warehouse stock quantity for a given SKU. Returns available units as an integer. Use whenever a customer asks if an item is in stock or how many are left.',
+  input_schema: {type: 'object', properties: {sku: {type: 'string', description: 'Product SKU, e.g. WM-2201'}}, required: ['sku']},
+};
+const SHIPPING_TOOL_JS = {
+  name: 'estimate_delivery',
+  description: 'Estimate delivery time in business days for a given SKU shipped to a given US zip code. Use whenever a customer asks how soon an item would arrive.',
+  input_schema: {type: 'object', properties: {sku: {type: 'string'}, zip: {type: 'string'}}, required: ['sku', 'zip']},
+};
+const STOCK_DB_JS = {'WM-2201': 34};
+
+async function runParallelToolsLive(out){
+  out.clear();
+  const userMsg = 'Is SKU WM-2201 in stock, and how soon could it get to zip 60614?';
+  out.log('> ' + userMsg, 'meta');
+  let messages = [{role: 'user', content: userMsg}];
+  try {
+    out.log('… calling Claude (ONE turn, both tools available)');
+    const resp = await callClaude({messages, tools: [STOCK_TOOL_JS, SHIPPING_TOOL_JS]});
+    messages.push({role: 'assistant', content: resp.content});
+    const toolUses = resp.content.filter(b => b.type === 'tool_use');
+    out.log('stop_reason = ' + JSON.stringify(resp.stop_reason), 'meta');
+    out.log(toolUses.length + ' tool_use block(s) in this ONE response:', toolUses.length > 1 ? 'ok' : 'meta');
+    toolUses.forEach(b => out.log('  -> ' + b.name + '(' + JSON.stringify(b.input) + ')  id=' + b.id));
+    if (toolUses.length < 2){
+      out.log('');
+      out.log('Model chose not to parallelize this time (it can happen) -- try again, or see "Maximizing parallel tool use" below for stronger system-prompt wording.', 'meta');
+    }
+    const t0 = performance.now();
+    const results = await Promise.all(toolUses.map(async block => {
+      await new Promise(r => setTimeout(r, 400)); // simulated backend latency, same cost for both
+      let content;
+      if (block.name === 'check_stock') content = JSON.stringify({sku: block.input.sku, units: STOCK_DB_JS[block.input.sku] ?? 0});
+      else content = JSON.stringify({sku: block.input.sku, zip: block.input.zip, days: 3, carrier: 'ground'});
+      return {type: 'tool_result', tool_use_id: block.id, content};
+    }));
+    const elapsed = Math.round(performance.now() - t0);
+    out.log('');
+    out.log('Executed ' + results.length + ' tool call(s) concurrently via Promise.all -- ' + elapsed + 'ms wall-clock (vs. ~' + (results.length * 400) + 'ms if run one-at-a-time)', 'ok');
+    out.log('Returning ALL results in a SINGLE user message, tool_results first, same order as the tool_use blocks -- required, not a style choice.');
+    messages.push({role: 'user', content: results});
+    const final = await callClaude({messages, tools: [STOCK_TOOL_JS, SHIPPING_TOOL_JS]});
+    const text = final.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    out.log('');
+    out.log('✔ Final answer: ' + text, 'ok');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+const CODE_MP1 = `// Multiple tool_use blocks in ONE assistant turn (stop_reason: "tool_use")
+{
+  "role": "assistant",
+  "content": [
+    {"type": "tool_use", "id": "toolu_01A", "name": "check_stock",
+     "input": {"sku": "WM-2201"}},
+    {"type": "tool_use", "id": "toolu_01B", "name": "estimate_delivery",
+     "input": {"sku": "WM-2201", "zip": "60614"}}
+  ]
+}
+
+// WRONG -- results split across two user messages. This "teaches" Claude,
+// from its own history, to stop parallelizing on later turns.
+[
+  {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01A", "content": "..."}]},
+  {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_01B", "content": "..."}]}
+]
+
+// RIGHT -- one user message, every tool_result together, same order,
+// and tool_result blocks come before any text content in that message.
+{
+  "role": "user",
+  "content": [
+    {"type": "tool_result", "tool_use_id": "toolu_01A", "content": "{\\"units\\": 34}"},
+    {"type": "tool_result", "tool_use_id": "toolu_01B", "content": "{\\"days\\": 3}"}
+  ]
+}
+
+// disable_parallel_tool_use lives INSIDE tool_choice, not top-level.
+"tool_choice": {"type": "auto", "disable_parallel_tool_use": true}  // -> at most 1 tool call
+"tool_choice": {"type": "any",  "disable_parallel_tool_use": true}  // -> exactly 1 tool call`;
+
+function renderMasterpieceHub(){
+  const cards = MASTERPIECE_TOPICS.map(t =>
+    '<div class="card" style="padding:14px 16px;cursor:pointer;" onclick="showSection(\''+t.id+'\')">'+
+    '<span class="pill">'+t.num+'</span>'+
+    '<h3 style="margin:8px 0 4px;">'+t.title+'</h3>'+
+    '<p style="font-size:13px;color:var(--ink-soft);margin:0;">'+t.objective+'</p>'+
+    '</div>'
+  ).join('');
+  return '<h2>Masterpiece</h2>'+
+  '<p class="dek">Custom deep dives, one topic at a time -- each gets a grounded concept card, an original '+
+  'diagram, a genuinely live "Run it for real" demo, and exam-format scenario questions checked against '+
+  'Anthropic\'s own documentation as it\'s written. Separate from the official 5-domain quiz bank, so this '+
+  'never skews Mock Exam scoring.</p>'+cards;
+}
+
+function renderMP1(){
+  return '<div class="taghead"><span class="pill">Masterpiece · MP-1</span></div>'+
+  '<h2>Parallel tool calls within a single turn</h2>'+
+  '<p class="dek">Objective: configure agentic loops to emit multiple tool calls within a single response '+
+  'turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li>Claude may return multiple <code>tool_use</code> blocks in one assistant turn (<code>stop_reason: "tool_use"</code>) when it identifies multiple independent operations -- Claude 4+ models do this by default when a request benefits from it</li>'+
+  '<li>The API does not prescribe execution order for a batch of calls -- that\'s the client\'s decision. Run independent, read-only calls concurrently for latency; run calls with side effects or ordering dependencies sequentially, stopping at the first failure if one occurs</li>'+
+  '<li>Correct result formatting is a hard requirement: every <code>tool_result</code> for a turn goes together in <b>one</b> next user message, each matched to its call by <code>tool_use_id</code>, and every <code>tool_result</code> block must come before any text content in that message</li>'+
+  '<li><code>disable_parallel_tool_use: true</code> lives <b>inside</b> the <code>tool_choice</code> object, not top-level. With <code>type: "auto"</code> it limits Claude to at most one tool call (it can still answer in plain text); with <code>type: "any"</code> or <code>"tool"</code> it limits Claude to exactly one</li>'+
+  '<li>Splitting tool results across separate user messages silently teaches Claude to stop parallelizing on later turns -- a documented, real troubleshooting gotcha, not a hypothetical</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Recognize when a task decomposes into independent subtasks with no shared state and no ordering requirement -- that\'s the entry condition for parallel tool use, not every multi-tool task</li>'+
+  '<li>Structure the client-side conversation as <b>one</b> turn containing every independent lookup, not N sequential turns -- the architecture fix, not a prompting trick</li>'+
+  '<li>Execute the batch of tool calls concurrently client-side (<code>Promise.all</code> / <code>asyncio.gather</code>) once Claude has returned multiple <code>tool_use</code> blocks, to actually realize the latency win</li>'+
+  '<li>Return <code>is_error: true</code> with a short explanation for any call in the batch you chose not to run, rather than omitting its <code>tool_result</code> -- every <code>tool_use</code> block needs a matching result</li>'+
+  '<li>If parallel calls degrade over a session, check message-history formatting first, before touching prompts or <code>tool_choice</code></li>'+
+  '<li>To push harder for parallel batching, add explicit system-prompt wording (Anthropic\'s docs show a stronger <code>&lt;use_parallel_tool_calls&gt;</code> block for this); to stop Claude bundling calls that actually depend on each other, add "Only batch tool calls that are independent of each other."</li></ul></div>'+
+  '<h3>Sequential vs. parallel, side by side</h3>'+mpParallelDiagramHTML()+
+  '<h3>Run it for real</h3>'+liveRunHTML({
+    title: 'One turn, two independent tools, one round trip -- live.',
+    body: 'Asks about stock and shipping for the same SKU in a single message. Watch for two tool_use blocks in one response, both executed concurrently, both results returned together.',
+    controlsHTML: '<button class="run" id="mp1-run">&#9654; Run live</button>',
+    consoleId: 'mp1-console',
+  })+
+  '<h3>The request/response shape</h3>'+
+  '<div class="card">'+cliCardHTML({
+    title: 'Multi-tool_use turn, correct vs. incorrect result formatting',
+    body: 'The exact shape that makes parallel tool use work -- and the exact mistake that quietly turns it back off.',
+    code: CODE_MP1,
+  })+'</div>'+
+  '<div class="note-inline"><b>Source-checked:</b> mechanics on this page (default behavior on Claude 4+, execution-order flexibility, the single-message result rule, <code>disable_parallel_tool_use</code>\'s location and per-<code>tool_choice</code>-type effect, and the message-splitting failure mode) are verified against Anthropic\'s current Claude API documentation, not recalled from memory.</div>'+
+  mpQuizMini('mp1');
+}
+
 const RENDERERS = {
   overview: renderOverview, t11: renderT11, t12: renderT12, t14: renderT14,
   t16: renderT16, t17: renderT17, capstones: renderCapstones,
@@ -2441,6 +2643,7 @@ const RENDERERS = {
   t41: renderT41, t43: renderT43, t45: renderT45, t46: renderT46,
   t51: renderT51, t52: renderT52, t53: renderT53, t55: renderT55,
   quiz: renderQuiz, mockexam: renderMockExam,
+  'mp-hub': renderMasterpieceHub, mp1: renderMP1,
 };
 
 /* =========================================================================
@@ -3105,6 +3308,9 @@ function attachLiveRunners(id){
   }
   if (id === 't55'){
     document.getElementById('provenance-run').onclick = runBtnGuard('provenance-run', () => runProvenanceLive(liveConsole('provenance-console')));
+  }
+  if (id === 'mp1'){
+    document.getElementById('mp1-run').onclick = runBtnGuard('mp1-run', () => runParallelToolsLive(liveConsole('mp1-console')));
   }
 }
 
