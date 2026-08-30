@@ -310,6 +310,7 @@ const SECTIONS = [
 
   {id:'mp-hub', num:'', label:'Overview', group:'Masterpiece — Custom Deep Dives'},
   {id:'mp1', num:'MP-1', label:'Parallel Tool Calls', group:'mp'},
+  {id:'mp2', num:'MP-2', label:'Session Resumption', group:'mp'},
 ];
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -2448,6 +2449,8 @@ function resetMockExam(){
 const MASTERPIECE_TOPICS = [
   {id: 'mp1', num: 'MP-1', title: 'Parallel tool calls within a single turn',
    objective: 'Configure agentic loops to emit multiple tool calls within a single response turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.'},
+  {id: 'mp2', num: 'MP-2', title: 'Session resumption: accurate state, no repeated work',
+   objective: 'Apply session resumption techniques -- including targeted re-analysis of changed files and context injection -- to restore agent state accurately without repeating prior work.'},
 ];
 
 const MASTERPIECE_QUIZ = [
@@ -2467,6 +2470,22 @@ const MASTERPIECE_QUIZ = [
      'The tool descriptions need <code>input_examples</code> added so Claude has clearer guidance on when each applies.',
    ], correct: 2,
    why: 'This is the single most common documented cause of parallel tool use quietly degrading over a session: message-history formatting is itself a signal the model reads back. A is a real phenomenon in general but the wrong diagnosis here, and trimming context wouldn\'t fix a formatting bug regardless. B doesn\'t touch formatting -- forcing <code>"any"</code> doesn\'t restore batching on its own. D improves how well Claude fills in a schema, not how many tools it decides to call in one turn.'},
+  {tag: 'mp2', stem: 'A team resumes a 3-day-old Claude Code session with <code>claude --resume backend-migration</code> to keep working on a large refactor. Two teammates pushed several commits to the same branch since the session last ran, and the engineer wants Claude to account for those changes before continuing -- without spending a full turn re-reading the entire codebase from scratch. What\'s the most effective way to do this?',
+   opts: [
+     'Rely on <code>claude --resume</code> alone -- resuming already restores the full conversation history, so no additional step is needed.',
+     'Add a <code>SessionStart</code> hook matched to <code>"resume"</code> that runs a command like <code>git status --short</code> or <code>git log --oneline</code> and lets its stdout become part of Claude\'s context automatically on resume, so Claude sees exactly what changed before doing anything else.',
+     'Start a brand-new session and ask Claude to re-read the entire repository from the top so nothing is missed.',
+     'Pass <code>--fork-session</code> when resuming so Claude begins from a clean branch of the conversation with no assumptions.',
+   ], correct: 1,
+   why: 'A <code>SessionStart</code> hook matched to <code>"resume"</code> is the documented mechanism for exactly this: Claude Code runs the command and adds its stdout to Claude\'s context automatically, before the first new turn. Anthropic\'s own docs show the identical pattern for the <code>"compact"</code> matcher (re-injecting context lost to summarization) and name <code>git log</code> as a valid command to swap in. Option A is the actual mistake this question is testing: <code>--resume</code> restores the conversation transcript, not knowledge of changes made on disk by someone else after the session paused -- the model\'s prior turns can reference file state that\'s now out of date. C throws away the restored history entirely and re-reads everything, exactly the repeated work this technique exists to avoid. D changes which conversation branch you\'re in; it does nothing about stale awareness of the codebase.'},
+  {tag: 'mp2', stem: 'An engineer launched a long Claude Code session with <code>--mcp-config ./project-mcp.json --add-dir ../shared-lib</code>, then exited and later resumed it by ID with <code>claude --resume</code>. In the resumed session, Claude can no longer see the MCP tools from <code>project-mcp.json</code>, and file references into <code>../shared-lib</code> fail. What\'s the accurate explanation?',
+   opts: [
+     'This is a bug -- <code>--resume</code> is documented to restore every launch-time flag automatically, including <code>--mcp-config</code> and <code>--add-dir</code>.',
+     '<code>--mcp-config</code> and <code>--add-dir</code> are not restored by <code>--resume</code>; they must be passed again on the resume command (a directory added mid-session with <code>/add-dir</code> isn\'t restored either) -- unlike <code>settings.json</code> / <code>settings.local.json</code>, which are re-read automatically at launch.',
+     'MCP servers and added directories are tied to the original session\'s process, so they can never be reattached in any resumed session, even by re-passing the flags.',
+     '<code>--continue</code> would have preserved them, but <code>--resume</code> never preserves any configuration from the original launch.',
+   ], correct: 1,
+   why: 'This matches the documented restore list exactly: conversation history, model, agent, permission mode, active goal, and unexpired scheduled tasks are restored; <code>--mcp-config</code>, <code>--settings</code>, <code>--plugin-dir</code>, <code>--fallback-model</code>, and any <code>--add-dir</code> (including one added mid-session) are not, and need to be passed again. Standard settings files are the documented exception that <i>is</i> reread automatically. A inverts the documented behavior. C is wrong -- re-passing the flags on the resume command does restore them; nothing here is permanently lost. D is also wrong: the restore list is the same regardless of whether you use <code>--continue</code> or <code>--resume</code> -- neither restores those specific flags.'},
 ];
 
 function mpQuizMini(tag){
@@ -2635,6 +2654,112 @@ function renderMP1(){
   mpQuizMini('mp1');
 }
 
+function mpResumeDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:150px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Naive -- discard the restored history', [
+      box('session paused,<br>files changed<br>elsewhere'), box('claude --resume'),
+      box('told to re-read<br>the whole repo'), box('full re-analysis,<br>prior findings repeated'),
+    ], 'Repeats work the session already paid for -- the restored history goes unused', false)+
+    row('Targeted -- resume, then inject just the delta', [
+      box('session paused,<br>files changed<br>elsewhere'), box('claude --resume', ['history restored', 'model + agent restored', 'permission mode restored']),
+      box('SessionStart hook<br>matcher: "resume"<br>runs git status/log'), box('diff injected as<br>context, pre-turn'), box('Claude re-checks<br>ONLY changed files'),
+    ], 'State restored once; only the actual delta gets fresh eyes', true)+
+  '</div>';
+}
+
+const CLI_MP2 = `# Resume the most recent session in the current directory
+claude --continue
+
+# Resume a specific session by ID or name -- or omit the name for
+# an interactive picker
+claude --resume backend-migration
+
+# Resume and immediately ask something, in one line
+claude --resume backend-migration "What's left before this PR is ready?"
+
+# From inside a running session
+/resume                        # opens the picker
+/resume backend-migration      # resumes it directly
+
+# Branch instead of continuing on the same transcript: a new session ID,
+# the original left untouched on disk
+claude --continue --fork-session
+# ...or, from inside a session:
+/branch try-a-different-approach`;
+
+const HOOK_MP2 = `// .claude/settings.json -- fires only when a saved session is resumed,
+// not on a fresh "claude" launch (matcher: "resume")
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git status --short && echo --- && git log --oneline -10"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+// On exit 0, Claude Code adds that stdout to Claude's context as plain
+// text -- automatically, before the first new turn. Anthropic's own docs
+// show this identical pattern for the "compact" matcher (re-injecting
+// context lost to summarization) and name git log as a valid command to
+// swap in; "resume" is the same mechanism applied to picking a session
+// back up instead of surviving a compaction.`;
+
+function renderMP2(){
+  return '<div class="taghead"><span class="pill">Masterpiece · MP-2</span></div>'+
+  '<h2>Session resumption: restoring state accurately without repeating work</h2>'+
+  '<p class="dek">Objective: apply session resumption techniques -- including targeted re-analysis of '+
+  'changed files and context injection -- to restore agent state accurately without repeating prior work.</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li><code>claude --continue</code> resumes the most recent interactive session in the current directory (it skips sessions started with <code>-p</code>, the Agent SDK, background sessions, and sessions whose first prompt was <code>/loop</code>, unless run as <code>claude -p --continue</code>); <code>claude --resume</code>, given an ID or name, targets that specific session directly, or opens an interactive picker with no argument; <code>/resume</code> switches sessions from inside a running one</li>'+
+  '<li>A resumed session restores: the full conversation history (including every tool call and result), the model it was using (with some exceptions), the agent, permission mode (following documented, path-specific rules), any still-active goal (its turn count, timer, and token-spend baseline reset), and unexpired scheduled tasks</li>'+
+  '<li>A resumed session does <b>not</b> automatically restore <code>--mcp-config</code>, <code>--settings</code>, <code>--plugin-dir</code>, <code>--fallback-model</code>, or any <code>--add-dir</code> -- including a directory added mid-session with <code>/add-dir</code>. Pass these again explicitly on the resume command. <code>settings.json</code> / <code>settings.local.json</code> are the exception -- they\'re re-read automatically at launch, so config living there needs no re-passing</li>'+
+  '<li>Session transcripts are stored locally as JSONL, one JSON object per line, under a per-project directory derived from the working-directory path -- the entry format is internal and can change between versions, so build on <code>/export</code> or a scripted interface (<code>claude -p --resume ... --output-format json</code>, a hook\'s transcript-path input, the Agent SDK) rather than parsing the file by hand</li>'+
+  '<li><code>--fork-session</code> (or <code>/branch</code> from inside a session) copies the conversation into a <b>new</b> session ID and switches you into it -- the original is left untouched on disk and stays resumable on its own</li>'+
+  '<li>Claude re-reads files fresh on every tool call, so file contents themselves are never stale mid-session -- what <i>can</i> go stale is the model\'s belief about a file, carried over in old conversation turns, if the disk changed after those turns without Claude being told</li>'+
+  '<li>A <code>SessionStart</code> hook fires whenever a session begins or resumes, matched by how it started: <code>startup</code>, <code>resume</code>, <code>clear</code>, <code>compact</code>, or <code>fork</code>. On exit 0, plain text the hook writes to stdout is added directly to Claude\'s context -- no extra agentic turn spent rediscovering it</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Wire a <code>SessionStart</code> hook matched to <code>resume</code> that runs something like <code>git status --short</code> or <code>git log --oneline</code>, so Claude sees exactly what changed on disk before doing anything else -- targeted re-analysis of the delta, not a full re-read</li>'+
+  '<li>Don\'t default to "start over and re-read everything" after a gap -- that discards conversation history the session already restored for free and repeats work it already paid for; scope any re-verification to what the diff actually shows changed</li>'+
+  '<li>Re-pass <code>--mcp-config</code>, <code>--add-dir</code>, <code>--plugin-dir</code>, <code>--fallback-model</code>, and <code>--settings</code> explicitly on the resume command if the original session needed them -- don\'t assume <code>--resume</code> brought them back</li>'+
+  '<li>Treat CLAUDE.md\'s freshness on resume as something to check, not assume -- if it may have changed since the session started, explicitly ask Claude to re-read it (or trigger that read via a hook) rather than trusting whatever context the transcript already carries</li>'+
+  '<li>Reach for <code>/export</code> or a scripted interface over parsing the JSONL transcript directly -- its internal shape isn\'t a stable contract across Claude Code versions</li></ul></div>'+
+  '<h3>Naive re-read vs. targeted resume, side by side</h3>'+mpResumeDiagramHTML()+
+  '<h3>Try it yourself -- resuming, branching, and forking</h3>'+cliCardHTML({
+    title: 'The resumption commands',
+    body: 'This is Claude Code CLI / config surface, not a raw API call -- there\'s no meaningful "live in the browser" version, so this is the actual CLI syntax to run yourself.',
+    code: CLI_MP2,
+  })+
+  '<h3>Injecting a targeted diff on resume</h3>'+cliCardHTML({
+    title: 'A SessionStart hook, matched to "resume"',
+    body: 'The concrete mechanism behind "context injection" for this objective -- adapted directly from Anthropic\'s own documented example for re-injecting context after compaction.',
+    code: HOOK_MP2,
+  })+
+  '<div class="note-inline"><b>Source-checked:</b> the restore/no-restore list, transcript storage location and format, fork/branch semantics, and the SessionStart hook\'s matcher values and stdout-to-context behavior are verified against Anthropic\'s current Claude Code documentation, not recalled from memory. One point is <b>not</b> confirmed either way in that documentation and is presented as such below: whether a resumed session automatically re-reads an updated CLAUDE.md, or continues with whatever was loaded when the original session started.</div>'+
+  mpQuizMini('mp2');
+}
+
 const RENDERERS = {
   overview: renderOverview, t11: renderT11, t12: renderT12, t14: renderT14,
   t16: renderT16, t17: renderT17, capstones: renderCapstones,
@@ -2643,7 +2768,7 @@ const RENDERERS = {
   t41: renderT41, t43: renderT43, t45: renderT45, t46: renderT46,
   t51: renderT51, t52: renderT52, t53: renderT53, t55: renderT55,
   quiz: renderQuiz, mockexam: renderMockExam,
-  'mp-hub': renderMasterpieceHub, mp1: renderMP1,
+  'mp-hub': renderMasterpieceHub, mp1: renderMP1, mp2: renderMP2,
 };
 
 /* =========================================================================
