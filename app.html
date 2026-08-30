@@ -2451,7 +2451,8 @@ const MASTERPIECE_TOPICS = [
    objective: 'Configure agentic loops to emit multiple tool calls within a single response turn, enabling parallel execution of independent subtasks and reducing total round-trip latency.',
    domains: 'Domain 1 · Agentic Architecture & Orchestration (loop mechanics) + Domain 2 · Tool Design & MCP Integration (batching and result-handling for MCP tool calls)'},
   {id: 'mp2', num: 'MP-2', title: 'Session resumption: accurate state, no repeated work',
-   objective: 'Apply session resumption techniques -- including targeted re-analysis of changed files and context injection -- to restore agent state accurately without repeating prior work.'},
+   objective: 'Apply session resumption techniques -- including targeted re-analysis of changed files and context injection -- to restore agent state accurately without repeating prior work.',
+   domains: 'Domain 1 · Agentic Architecture & Orchestration (task 1.7 -- session state, resumption, forking) + Domain 3 · Claude Code Configuration & Workflows (--resume/--continue flags, SessionStart hooks, settings files)'},
 ];
 
 const MASTERPIECE_QUIZ = [
@@ -2504,6 +2505,14 @@ const MASTERPIECE_QUIZ = [
      '<code>--continue</code> would have preserved them, but <code>--resume</code> never preserves any configuration from the original launch.',
    ], correct: 1,
    why: 'This matches the documented restore list exactly: conversation history, model, agent, permission mode, active goal, and unexpired scheduled tasks are restored; <code>--mcp-config</code>, <code>--settings</code>, <code>--plugin-dir</code>, <code>--fallback-model</code>, and any <code>--add-dir</code> (including one added mid-session) are not, and need to be passed again. Standard settings files are the documented exception that <i>is</i> reread automatically. A inverts the documented behavior. C is wrong -- re-passing the flags on the resume command does restore them; nothing here is permanently lost. D is also wrong: the restore list is the same regardless of whether you use <code>--continue</code> or <code>--resume</code> -- neither restores those specific flags.'},
+  {tag: 'mp2', stem: 'An engineer paused a Claude Code session named <code>checkout-refactor</code> mid-way through refactoring the payment module. Two weeks later, before resuming, they check the repo and find: (1) the refactor task itself is still exactly what needs finishing -- nothing about the goal changed, and (2) a teammate separately merged a large dependency upgrade that touched over 200 files across the whole repo, including a few of the exact files the paused session was mid-edit on. The engineer is deciding how to pick this back up. What\'s the most accurate approach?',
+   opts: [
+     'Run <code>claude --resume checkout-refactor</code> and trust the restored conversation history without any extra step -- the task is unchanged, so the prior analysis is still valid.',
+     'Start a brand-new session and re-explain the refactor goal from scratch, since a 200-file merge means any old context is now suspect.',
+     'Resume the session, but before continuing, have Claude look specifically at the files the refactor touches -- for example <code>git log --oneline -- src/payments/</code>, scoped to that directory rather than the full 200-file diff -- to check whether the merge changed anything the paused work depended on, then continue only if it didn\'t invalidate the plan.',
+     'Run <code>claude --resume checkout-refactor --fork-session</code>, since forking automatically re-verifies every file the old conversation referenced before letting you continue.',
+   ], correct: 2,
+   why: 'C is correct because the diff that actually matters here isn\'t "everything that changed since you paused," it\'s "did anything change in the specific area this session cares about." Scoping the re-check to the refactor\'s own files (a targeted <code>git log</code> or <code>git diff</code> against just that path) answers the real question in seconds, whether or not the other 195+ files are relevant. A is the blind-trust failure mode: two of the changed files DO overlap the paused work, so skipping any check risks building on assumptions the merge already broke. B overcorrects -- the task hasn\'t changed, and most of that 200-file diff is unrelated noise to this session specifically; discarding the accumulated refactor plan and decisions throws away exactly the history that\'s still valuable, matching the documented "kitchen sink" logic backwards; the SESSION isn\'t cluttered, the merge is just large elsewhere. D misdescribes what <code>--fork-session</code> actually does -- it copies the existing transcript into a new session ID, nothing more; it performs no verification of any kind on its own.'},
 ];
 
 function mpQuizMini(tag){
@@ -2776,6 +2785,37 @@ function mpResumeDiagramHTML(){
   '</div>';
 }
 
+function mpWhiteboardDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:135px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Blind resume -- never look at the board again', [
+      box('you step out,<br>coworker edits<br>the board'), box('claude --resume,<br>no check'),
+      box('keep talking as if<br>nothing changed'),
+    ], 'May repeat a plan for something already handled, or contradict a new note without noticing', false)+
+    row('Start over -- wipe the board, re-explain everything', [
+      box('you step out,<br>coworker edits<br>the board'), box('brand-new session'),
+      box('re-explain the whole<br>project from zero'),
+    ], 'Throws away every decision already reasoned through -- repeats work already paid for', false)+
+    row('Targeted resume -- quick glance, then continue', [
+      box('you step out,<br>coworker edits<br>the board'), box('claude --resume', ['history restored']),
+      box('quick glance at just<br>what looks different'), box('continue using<br>everything else agreed'),
+    ], 'Old reasoning preserved; only the actual delta gets fresh attention', true)+
+  '</div>';
+}
+
 const CLI_MP2 = `# Resume the most recent session in the current directory
 claude --continue
 
@@ -2826,6 +2866,10 @@ function renderMP2(){
   '<h2>Session resumption: restoring state accurately without repeating work</h2>'+
   '<p class="dek">Objective: apply session resumption techniques -- including targeted re-analysis of '+
   'changed files and context injection -- to restore agent state accurately without repeating prior work.</p>'+
+  '<p style="font-size:12px;color:var(--accent);margin:-6px 0 18px;">Spans Domain 1 · Agentic Architecture '+
+  '&amp; Orchestration (task 1.7 -- session state, resumption, and forking) and Domain 3 · Claude Code '+
+  'Configuration &amp; Workflows (the <code>--resume</code>/<code>--continue</code> flags, <code>SessionStart</code> '+
+  'hooks, and settings-file behavior are configuration surface, not API mechanics).</p>'+
   '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
   '<li><code>claude --continue</code> resumes the most recent interactive session in the current directory (it skips sessions started with <code>-p</code>, the Agent SDK, background sessions, and sessions whose first prompt was <code>/loop</code>, unless run as <code>claude -p --continue</code>); <code>claude --resume</code>, given an ID or name, targets that specific session directly, or opens an interactive picker with no argument; <code>/resume</code> switches sessions from inside a running one</li>'+
   '<li>A resumed session restores: the full conversation history (including every tool call and result), the model it was using (with some exceptions), the agent, permission mode (following documented, path-specific rules), any still-active goal (its turn count, timer, and token-spend baseline reset), and unexpired scheduled tasks</li>'+
@@ -2840,7 +2884,67 @@ function renderMP2(){
   '<li>Re-pass <code>--mcp-config</code>, <code>--add-dir</code>, <code>--plugin-dir</code>, <code>--fallback-model</code>, and <code>--settings</code> explicitly on the resume command if the original session needed them -- don\'t assume <code>--resume</code> brought them back</li>'+
   '<li>Treat CLAUDE.md\'s freshness on resume as something to check, not assume -- if it may have changed since the session started, explicitly ask Claude to re-read it (or trigger that read via a hook) rather than trusting whatever context the transcript already carries</li>'+
   '<li>Reach for <code>/export</code> or a scripted interface over parsing the JSONL transcript directly -- its internal shape isn\'t a stable contract across Claude Code versions</li></ul></div>'+
+  '<h3>Simpler version: coming back to a shared whiteboard</h3>'+
+  '<div class="card" style="padding:16px 18px;">'+
+  '<p>You and a coworker are planning a project on a big whiteboard. You step out for a long coffee break -- '+
+  'the session pauses, but nothing about the board is "saved" anywhere except what\'s already written on it.</p>'+
+  '<p>While you\'re gone, your coworker erases a few things you\'d already covered and adds new notes of '+
+  'their own. When you come back, you have three options.</p>'+
+  '<p>You could keep talking exactly where you left off, never looking at the board again -- but now you '+
+  'might repeat a plan for something your coworker already erased and handled, or contradict a new note '+
+  'without noticing it\'s there. Nothing announces itself as wrong; it just quietly is.</p>'+
+  '<p>You could wipe the whole board and explain the entire project to a brand-new person from zero -- safe, '+
+  'but you just threw away every decision, every constraint, every piece of reasoning the two of you already '+
+  'worked through. That\'s hours of discussion, gone, to protect against a problem a five-second glance would '+
+  'have caught.</p>'+
+  '<p>Or -- the option that actually works -- you glance at just the parts of the board that look different '+
+  'from when you left, update your understanding of only those parts, and keep going using everything else '+
+  'you\'d already agreed on.</p>'+
+  '</div>'+
+  mpWhiteboardDiagramHTML()+
+  '<div class="note-inline"><b>Mapping it back to the code:</b> "quick glance at what changed" is <code>git '+
+  'status</code> / <code>git diff</code>, ideally auto-injected by the <code>SessionStart</code> "resume" hook '+
+  'below. "Everything else already agreed on" is the conversation history <code>--resume</code> restores for '+
+  'free. Wiping the board and starting from zero is the costly, repeated-work failure mode this whole '+
+  'objective exists to avoid.</div>'+
   '<h3>Naive re-read vs. targeted resume, side by side</h3>'+mpResumeDiagramHTML()+
+  '<h3>When to resume vs. start new vs. branch -- an accurate decision guide</h3>'+
+  '<div class="card" style="padding:16px 18px;">'+
+  '<p>There\'s no single documented flowchart for this, but Anthropic\'s own docs give concrete, citable '+
+  'signals to decide by -- this is grounded in those, not a guess:</p>'+
+  '<p><b>Resume when:</b></p><ul>'+
+  '<li>The task is unchanged and the accumulated conversation history is still valuable -- Anthropic\'s own '+
+  'best-practices guide says this explicitly: "sometimes you should let context accumulate because you\'re '+
+  'deep in one complex problem and the history is valuable"</li>'+
+  '<li>What changed on disk since you paused is small enough to point Claude at directly (a handful of '+
+  'commits, a few files) -- pair the resume with the <code>SessionStart</code> "resume" hook technique above '+
+  'so Claude sees the delta before doing anything else</li></ul>'+
+  '<p><b>Start a genuinely new session when:</b></p><ul>'+
+  '<li>The task itself is different from what the old session was doing -- carrying old, unrelated history '+
+  'into a new task is the documented "kitchen sink session" failure pattern</li>'+
+  '<li>You\'ve corrected the same issue more than twice already in that session -- the documented guidance is '+
+  'explicit: "After two failed corrections, /clear and start fresh with a more specific prompt that '+
+  'incorporates what you learned. A clean session with a better prompt almost always outperforms a long '+
+  'session with accumulated corrections"</li>'+
+  '<li>You\'re moving from planning/exploration into implementation and want clean, focused context -- '+
+  'Anthropic\'s own recommended workflow for larger features ends with: "start a fresh session to execute '+
+  '[the spec]. The new session has clean context focused entirely on implementation"</li>'+
+  '<li>What changed since you paused is large and untargeted -- a big merge, a different branch, most of the '+
+  'codebase touched. At that point a "targeted diff" isn\'t targeted anymore, and the cost/benefit that '+
+  'favors resuming flips</li>'+
+  '<li>The session already crossed Claude Code\'s own documented staleness line: inactive more than about an '+
+  'hour <b>and</b> over 100,000 tokens (Pro/Max plans). Claude Code detects this itself and opens a dialog '+
+  'before your first message -- resume from summary, resume in full, or don\'t ask again -- a concrete, '+
+  'built-in signal that the session has drifted, not a vibe</li></ul>'+
+  '<p><b>Branch instead (<code>/branch</code> or <code>--fork-session</code>) when:</b></p><ul>'+
+  '<li>You want to try a different approach given what\'s changed, without risking the path you were '+
+  'already on -- branching copies the conversation into a new session ID and leaves the original untouched '+
+  'and separately resumable</li></ul>'+
+  '<p>The signal underneath all of it is the same one this whole objective is built on: is the task still '+
+  'the same, and is what changed still small enough to point Claude at directly? Yes to both -&gt; resume and '+
+  'inject the delta. Either answer flips -&gt; a fresh, tightly-scoped session beats dragging stale history '+
+  'along.</p>'+
+  '</div>'+
   '<h3>Try it yourself -- resuming, branching, and forking</h3>'+cliCardHTML({
     title: 'The resumption commands',
     body: 'This is Claude Code CLI / config surface, not a raw API call -- there\'s no meaningful "live in the browser" version, so this is the actual CLI syntax to run yourself.',
@@ -2851,7 +2955,7 @@ function renderMP2(){
     body: 'The concrete mechanism behind "context injection" for this objective -- adapted directly from Anthropic\'s own documented example for re-injecting context after compaction.',
     code: HOOK_MP2,
   })+
-  '<div class="note-inline"><b>Source-checked:</b> the restore/no-restore list, transcript storage location and format, fork/branch semantics, and the SessionStart hook\'s matcher values and stdout-to-context behavior are verified against Anthropic\'s current Claude Code documentation, not recalled from memory. One point is <b>not</b> confirmed either way in that documentation and is presented as such below: whether a resumed session automatically re-reads an updated CLAUDE.md, or continues with whatever was loaded when the original session started.</div>'+
+  '<div class="note-inline"><b>Source-checked:</b> the restore/no-restore list, transcript storage location and format, fork/branch semantics, the SessionStart hook\'s matcher values and stdout-to-context behavior, the &gt;100k-token/&gt;1hr resume-from-summary threshold, and the quoted best-practices guidance (kitchen-sink sessions, the two-corrections rule, fresh sessions for implementation) are verified against Anthropic\'s current Claude Code documentation, not recalled from memory. The "when to resume vs. new vs. branch" guide above is a synthesis built on those cited facts, not a verbatim doc rule -- flagged as such rather than presented as more official than it is. One point is <b>not</b> confirmed either way in the documentation and is presented as such: whether a resumed session automatically re-reads an updated CLAUDE.md, or continues with whatever was loaded when the original session started.</div>'+
   mpQuizMini('mp2');
 }
 
