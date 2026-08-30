@@ -899,6 +899,12 @@ const QUIZ = [
  {tag:'3.4', stem:'A bug fix is a single added null-check in one function, with a stack trace pointing directly at the problem. Plan mode or direct execution?',
   opts:['Plan mode -- always explore before changing code','Direct execution -- the scope is already completely clear','Plan mode, then direct execution for the actual fix','Neither -- ask the user to fix it manually'],
   correct:1, why:'Plan mode earns its overhead on large-scale, multi-approach, architectural work. A single well-scoped fix with a clear cause doesn\'t need exploration first.'},
+ {tag:'3.1', stem:'A session\'s context is getting full during a long debugging investigation. The developer wants to keep working in the same conversation, just with a lighter context footprint, and still be able to reference what was found earlier. Which command, and why not the alternative?',
+  opts:['<code>/clear</code> -- it frees the most context since it removes everything','<code>/compact</code> -- it summarizes the conversation so far, freeing context while keeping a condensed history to continue from; <code>/clear</code> would discard the investigation\'s findings entirely, not just shrink them','<code>/memory</code> -- it manages CLAUDE.md, not conversation length','Neither -- start a completely new session with no context at all'],
+  correct:1, why:'<code>/compact</code> is specifically for freeing context while continuing the same conversation, condensing rather than discarding. <code>/clear</code> (aliased <code>/reset</code>, <code>/new</code>) starts an empty conversation -- the old transcript is still reachable via <code>/resume</code>, but nothing from it is in the active context anymore. For "keep working, just lighter," compact is the one built for that; clear solves a different problem.'},
+ {tag:'3.2', stem:'A developer runs <code>/review</code> and later refers to it as "the built-in review command." A teammate points out it can take flags like <code>--fix</code> and <code>--comment</code>. What is <code>/review</code> actually?',
+  opts:['A raw built-in command hardcoded into Claude Code with no configurable behavior','An alias for <code>/code-review</code>, a bundled skill -- which is why it has a real flag surface (<code>--fix</code> to apply findings, <code>--comment</code> to post inline PR comments, <code>ultra</code> for a deeper cloud review)','A community plugin that has to be installed separately','The same thing as <code>/memory</code>, just for code instead of CLAUDE.md'],
+  correct:1, why:'<code>/review</code> is documented as an alias for <code>/code-review</code>, which ships as a bundled skill rather than a plain command -- skills can carry a richer flag surface than a "built-in command with no options" framing would suggest.'},
  {tag:'3.5', stem:'A prose-described data transformation ("normalize the dates") produces inconsistent results across similar inputs. Most effective fix?',
   opts:['Repeat the instruction more forcefully','Add 2-3 concrete input -> output examples pinning down the exact transformation','Lower the temperature','Break it into ten smaller prose instructions'],
   correct:1, why:'Concrete examples communicate exactly what "normalize" means in a way prose descriptions -- however careful -- leave to interpretation.'},
@@ -976,6 +982,9 @@ const QUIZ = [
  {tag:'2.2', stem:'An MCP tool\'s structured error responses correctly distinguish a retryable timeout from a non-retryable policy-violation error via an <code>isRetryable</code> flag. The calling agent retries the policy-violation error twice anyway before giving up. What\'s the actual bug?',
   opts:['The tool\'s error format is wrong','The agent isn\'t reading and respecting the <code>isRetryable</code> flag -- it should never retry an error marked non-retryable','Policy violations should never be returned as errors at all','The tool needs a longer timeout'],
   correct:1, why:'The whole point of structured error metadata is that the caller acts on it. A well-designed error response was produced here -- the defect is in the agent ignoring the retryable flag it was given.'},
+ {tag:'2.2', stem:'A booking-cancellation tool call fails because the user\'s account does not have permission to cancel bookings made by other team members. How should this be categorized and handled?',
+  opts:['Transient -- retry with backoff until permission is granted','Validation -- ask the agent to fix the input and retry','Business -- explain the policy to the user without retrying','Permission -- <code>isRetryable: false</code>, escalate rather than retry, since no amount of retrying grants access that was never there'],
+  correct:3, why:'This is specifically an access/permission failure, not a policy judgment call (business) or a malformed request (validation) or a flaky dependency (transient). Retrying does nothing -- the fix is escalation, exactly the way a capability gap in Task 4.4 needs human review rather than more retries.'},
  {tag:'2.4', stem:'One developer wants to experiment with a new MCP server that only they use, without changing the shared team configuration or affecting any other teammate. Where does it belong?',
   opts:['Project-scoped <code>.mcp.json</code>, committed to the repo','User-scoped <code>~/.claude.json</code>','A new branch dedicated to the experiment','It can\'t be done without team sign-off'],
   correct:1, why:'User-scope MCP configuration is personal and local to that developer\'s machine -- exactly suited to a solo experiment that shouldn\'t touch the shared, version-controlled project config.'},
@@ -1714,7 +1723,7 @@ function renderT22(){
   'is how you control whether the model can skip tools entirely, must call some tool, or must call one specific tool.</p>'+
   '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
   '<li>The MCP <code>isError</code> flag pattern for signaling tool failure back to the agent</li>'+
-  '<li>Transient (timeout) vs. validation (bad input) vs. business (policy) vs. permission errors — each needs a different reaction</li>'+
+  '<li>Four error categories, four different reactions: <b>transient</b> (timeout, service unavailable) → retry with backoff, <code>isRetryable: true</code>. <b>Validation</b> (bad input) → fix the input and retry, <code>isRetryable: true</code>. <b>Business</b> (policy violation) → explain to the user, do not retry, <code>isRetryable: false</code> with a customer-friendly message. <b>Permission</b> (access denied) → escalate, <code>isRetryable: false</code></li>'+
   '<li><code>tool_choice</code>: <code>"auto"</code> (may skip), <code>"any"</code> (must call some tool), <code>{"type":"tool","name":"..."}</code> (must call that one)</li>'+
   '<li>Too many tools (18 instead of 4–5) degrades selection reliability by increasing decision complexity</li>'+
   '<li>Agents given tools outside their specialization tend to misuse them (a synthesis agent attempting its own web searches instead of asking the coordinator) — scope each agent to its role, with a few narrow cross-role tools for genuinely high-frequency shared needs</li></ul>'+
@@ -1723,6 +1732,13 @@ function renderT22(){
   '<li>Distinguish access failures (retry-worthy) from valid empty results (successful query, no matches)</li>'+
   '<li>Force a specific tool with <code>tool_choice</code> to guarantee a step runs before others</li>'+
   '<li>Scope each agent to the 4–5 tools its role actually needs</li></ul></div>'+
+  '<h3>The four categories, side by side</h3>'+
+  '<div class="card"><table class="decision-table"><tr><th>Category</th><th>Example</th><th>Agent reaction</th><th>isRetryable</th></tr>'+
+  '<tr><td>Transient</td><td>Timeout, service unavailable</td><td>Retry with backoff</td><td>true</td></tr>'+
+  '<tr><td>Validation</td><td>Invalid input (bad date format, missing field)</td><td>Fix the input, then retry</td><td>true</td></tr>'+
+  '<tr><td>Business</td><td>Policy violation (refund outside the return window)</td><td>Explain to the user — do not retry</td><td>false, with a customer-friendly message</td></tr>'+
+  '<tr><td>Permission</td><td>Access denied</td><td>Escalate — retrying won\'t grant access</td><td>false</td></tr>'+
+  '</table></div>'+
   '<h3>Run it for real — structured errors</h3>'+errorCategoryRunHTML()+
   '<h3>Run it for real — tool_choice modes</h3>'+toolChoiceRunHTML()+
   '<h3>The code</h3><div class="card">'+codePanelHTML('tool-choice', CODE_TOOLCHOICE, null, false)+'</div>'+
@@ -1961,6 +1977,14 @@ paths: ["src/api/**/*.ts"]
 - Every handler validates its input with zod before touching the DB
 - Return errors as { code, message }, never a bare string`,
   })+
+  '<h3>Slash commands worth knowing cold</h3>'+
+  '<div class="card"><table class="decision-table"><tr><th>Command</th><th>What it actually does</th><th>Easy to confuse with</th></tr>'+
+  '<tr><td><code>/init</code></td><td>Generates a starting <code>CLAUDE.md</code> by analyzing the project. If it finds config from another coding agent (e.g. an <code>AGENTS.md</code>), it offers to carry it over via <code>/import</code> rather than making you redo it</td><td>Running it on a repo that already has a CLAUDE.md — it proposes improvements, it does not silently overwrite</td></tr>'+
+  '<tr><td><code>/compact</code></td><td><b>Summarizes</b> the conversation so far to free up context — you can continue the same conversation afterward, now with a condensed history instead of the full one</td><td><code>/clear</code> — compact keeps a summary; clear keeps nothing</td></tr>'+
+  '<tr><td><code>/clear</code></td><td><b>Discards</b> context entirely and starts a new conversation. Aliases: <code>/reset</code>, <code>/new</code>. You can still get back to the old one with <code>/resume</code> — clearing doesn\'t delete the transcript, just detaches from it</td><td>Thinking it\'s the same as <code>/compact</code> — clear loses the details compact would have preserved as a summary</td></tr>'+
+  '<tr><td><code>/memory</code></td><td>Edits CLAUDE.md files directly, and views/enables/disables auto memory entries</td><td><code>/context</code> — memory lets you edit configuration; context shows you what actually loaded <i>this session</i></td></tr>'+
+  '<tr><td><code>/review</code></td><td>Alias for <code>/code-review</code>, a <b>bundled skill</b>, not a raw built-in command. Reviews the current diff (or a PR/branch/path you pass) for bugs and cleanup opportunities. Real flags: <code>--fix</code> applies findings, <code>--comment</code> posts inline PR comments, <code>ultra</code> runs a deeper cloud review</td><td>Assuming it\'s a plain built-in command with no options — it\'s a skill with a real flag surface</td></tr>'+
+  '</table></div>'+
   '<h3>The full hands-on lab</h3>'+
   '<p class="dek" style="margin-top:-6px;">Every step below is real — build these actual files in a scratch '+
   'directory and confirm each mechanism with the real Claude Code CLI. No API key needed anywhere in it.</p>'+
@@ -2049,6 +2073,8 @@ function renderT43(){
   '<li>It does not catch semantic errors: line items that don\'t sum to the total, values in the wrong field</li>'+
   '<li>Nullable fields prevent the model from fabricating a value just to satisfy a required field</li>'+
   '<li>For extensible categories, pair an enum with an <code>"other"</code> value plus a free-text detail field, rather than forcing every case into a fixed list</li>'+
+  '<li>Add a separate <code>"unclear"</code> enum value for genuinely ambiguous cases — distinct from <code>"other"</code>, which is for cases that clearly exist but weren\'t on the original list. Forcing an ambiguous case into a definite category invites a confident-sounding guess instead of an honest signal that a human should look at it</li>'+
+  '<li>A strict schema constrains <i>shape</i>, not incoming <i>format</i> — pairing it with format-normalization instructions in the prompt (e.g. "dates may appear as MM/DD/YYYY, DD-MM-YYYY, or written out; normalize all to ISO 8601") handles inconsistent source formatting the schema alone can\'t</li>'+
   '<li>The retry boundary: retry-with-error-feedback fixes format/structural mismatches (the model had the right information and stated it wrong). It cannot fix a genuine <b>capability gap</b> — e.g. content in a language the model cannot meaningfully analyze. No retry count fixes an absent capability; route those to human review instead</li>'+
   '<li>Tagging each finding with a <code>detected_pattern</code> field (what triggered it) does two things: gives validation something concrete to check for internal consistency against the assigned category, and (secondarily) enables analysis of which patterns get dismissed most often over time. The <b>primary</b> value in a retry loop is the first one — a specific, actionable mismatch to feed back, not a vague "try again"</li></ul></div>'+
   '<h3>Run it for real</h3>'+structuredRunHTML()+
