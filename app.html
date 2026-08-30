@@ -893,6 +893,9 @@ const QUIZ = [
  {tag:'3.2', stem:'A skill produces long, exploratory output you don\'t want polluting the main conversation\'s context. Which frontmatter option isolates it?',
   opts:['<code>allowed-tools</code>','<code>argument-hint</code>','<code>context: fork</code>','<code>model: opus</code>'],
   correct:2, why:'<code>context: fork</code> runs the skill in an isolated sub-agent context specifically so its verbose output doesn\'t pollute the main session.'},
+ {tag:'3.1', stem:'A documentation team needs to update reference docs for three independent microservices at the same time after a breaking change. Each update means reading that service\'s source, editing Markdown, and validating links -- and one Claude Code session trying to hold all three services\' code at once would blow its context budget. What\'s the right structure?',
+  opts:['A single skill with <code>context: fork</code> that processes all three services in parallel within one session','<code>git worktree</code>: one separate checkout/branch per service, each with its own <code>claude --worktree</code> session running at the same time, merged afterward','Process the three sequentially in the same session, running <code>/compact</code> between each to free context','Split the docs into smaller chunks and process each chunk via the Message Batches API'],
+  correct:1, why:'This is three genuinely independent, simultaneously-runnable workstreams, each needing its own working directory -- exactly what git worktree is for: separate checkouts on separate branches, one Claude Code session per worktree, no shared context to blow the budget on. A single-session fork still bottlenecks all three through one session; sequential processing defeats "at the same time"; the Batches API is for latency-tolerant async workloads, not an interactive editing task like this.'},
  {tag:'3.3', stem:'A testing convention needs to apply to every <code>*.test.tsx</code> file, which are scattered across many unrelated directories rather than one subtree. Best mechanism?',
   opts:['A CLAUDE.md file placed in each directory containing test files','A single <code>.claude/rules/</code> file with a glob pattern like <code>paths: ["**/*.test.tsx"]</code>','One giant root CLAUDE.md covering every case','A skill invoked manually before writing each test'],
   correct:1, why:'Glob-pattern rules apply by file type regardless of location -- exactly suited to conventions that don\'t follow the directory structure. Directory-level CLAUDE.md files can\'t easily cover files spread across many directories.'},
@@ -1977,6 +1980,21 @@ paths: ["src/api/**/*.ts"]
 - Every handler validates its input with zod before touching the DB
 - Return errors as { code, message }, never a bare string`,
   })+
+  '<h3>Running genuinely parallel, independent Claude Code sessions</h3>'+
+  '<p class="dek" style="margin-top:-6px;">Not the same problem <code>context: fork</code> solves. Fork isolates a skill\'s exploration <b>within one session</b>. When you need several fully independent, simultaneously-running sessions — each editing files without stepping on the others — that\'s <code>git worktree</code>.</p>'+
+  cliCardHTML({
+    title: 'One repo, three isolated working directories, three parallel sessions',
+    body: 'Each worktree is a separate checkout on its own branch, created from an existing commit — so the repo needs at least one commit first. Run the same command with a different name in another terminal to start a second, fully independent session; neither sees the other\'s edits until you merge.',
+    code: `# terminal 1
+claude --worktree feature-auth
+
+# terminal 2, same repo, different terminal
+claude --worktree feature-billing
+
+# each session gets its own checkout and branch -- editing
+# files in one never touches the other's working directory`,
+  })+
+  '<div class="note-inline"><b>When to reach for which:</b> three independent tasks that need their own working directory and can run at the same time → <code>git worktree</code>, one Claude Code process per task. One task that needs isolated context for a noisy sub-step but stays inside a single overall session → a skill with <code>context: fork</code>. Trying to solve the worktree problem with fork alone still bottlenecks everything through one session\'s context, even if the noisy part is isolated.</div>'+
   '<h3>Slash commands worth knowing cold</h3>'+
   '<div class="card"><table class="decision-table"><tr><th>Command</th><th>What it actually does</th><th>Easy to confuse with</th></tr>'+
   '<tr><td><code>/init</code></td><td>Generates a starting <code>CLAUDE.md</code> by analyzing the project. If it finds config from another coding agent (e.g. an <code>AGENTS.md</code>), it offers to carry it over via <code>/import</code> rather than making you redo it</td><td>Running it on a repo that already has a CLAUDE.md — it proposes improvements, it does not silently overwrite</td></tr>'+
