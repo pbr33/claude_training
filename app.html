@@ -312,6 +312,7 @@ const SECTIONS = [
   {id:'mp1', num:'MP-1', label:'Parallel Tool Calls', group:'mp'},
   {id:'mp2', num:'MP-2', label:'Session Resumption', group:'mp'},
   {id:'mp3', num:'MP-3', label:'Subagent Prompts', group:'mp'},
+  {id:'mp4', num:'MP-4', label:'Goal vs. Procedural', group:'mp'},
 ];
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -2457,6 +2458,9 @@ const MASTERPIECE_TOPICS = [
   {id: 'mp3', num: 'MP-3', title: 'Self-sufficient subagent prompts',
    objective: 'Construct subagent prompts that include all findings, structured data, and source metadata required for task completion without returning to the coordinator for missing context.',
    domains: 'Domain 1 · Agentic Architecture & Orchestration (tasks 1.2/1.3 -- coordinator-subagent orchestration, context passing)'},
+  {id: 'mp4', num: 'MP-4', title: 'Goal-oriented vs. procedural subagent delegation',
+   objective: 'Evaluate subagent delegation strategies -- goal-oriented versus procedural instructions -- and select the approach that enables adaptive behavior while maintaining coordinator visibility and control.',
+   domains: 'Domain 1 · Agentic Architecture & Orchestration (tasks 1.2/1.3 -- delegation strategy, and 1.4 -- enforcement/handoff patterns)'},
 ];
 
 const MASTERPIECE_QUIZ = [
@@ -2533,6 +2537,22 @@ const MASTERPIECE_QUIZ = [
      'A prompt that pastes the coordinator\'s entire conversation transcript so far, on the theory that more context always produces a more accurate result.',
    ], correct: 1,
    why: 'B matches the requirement precisely: everything Subagent 2 needs -- the specific change, its value and timestamp, and its source and confidence -- is stated explicitly and labeled, and the task is scoped to exactly what to check it against. A repeats the underspecified-prompt mistake from the previous question, just with a different task. C assumes default inter-subagent messaging that doesn\'t exist unless both agents are explicitly given the <code>SendMessage</code> tool -- that\'s the exception, not the default architecture. D is a real anti-pattern in its own right: dumping the full transcript into a fresh, isolated context defeats the isolation benefit that makes subagents useful, buries the one fact that actually matters in irrelevant noise, and costs more tokens for a worse result than a short, labeled excerpt.'},
+  {tag: 'mp4', stem: 'A coordinator delegates "clean up all lint errors in the frontend and don\'t stop until CI is green" to a subagent, framed as a goal rather than a step list. The coordinator wants to remain able to monitor progress and step in if the subagent stalls or runs long, without babysitting every tool call. Which combination of real, documented mechanisms actually gives the coordinator that visibility and control?',
+   opts: [
+     'Nothing extra is needed -- goal-oriented subagent prompts inherently self-limit and always report back the moment something looks wrong.',
+     'Set <code>maxTurns</code> on the subagent\'s <code>AgentDefinition</code> so it stops (with a partial-output marker you can resume from) rather than running unbounded, and require the subagent\'s final report to state exactly what it changed and why -- since the coordinator only ever sees the subagent\'s final message, never its in-progress steps.',
+     'Use <code>/goal</code> inside the subagent\'s own <code>AgentDefinition.prompt</code>, since <code>/goal</code> is designed specifically to supervise a subagent from the inside while it works.',
+     'Give the subagent every tool available (omit the <code>tools</code> field) so it has maximum flexibility to solve the problem however it needs to.',
+   ], correct: 1,
+   why: 'B combines two real, documented control levers correctly: <code>maxTurns</code> bounds runaway adaptive work and marks incomplete output as partial rather than silently wrong (resumable via its <code>agentId</code>), and since only the subagent\'s FINAL message ever returns to the coordinator, an explicit reporting requirement is the only way visibility into what it actually did survives that isolation boundary. A is wishful thinking -- nothing about goal-oriented framing is self-limiting by default; that\'s exactly why explicit constraints and reporting matter. C misapplies <code>/goal</code>: it\'s documented as a wrapper around a session-scoped Stop hook for the session running it, not a parameter you hand to a subagent to supervise itself -- in fact <code>/goal</code> treats a running subagent as background work it waits on, evaluating only once the subagent finishes, not from the inside. D is backwards for control: unrestricted tools maximize flexibility at the direct expense of the "control" half of the objective.'},
+  {tag: 'mp4', stem: 'Two candidate subagent prompts for the same task. Prompt 1: "Open <code>src/pricing.py</code>, go to line 47, change the tax rate constant from 0.07 to 0.0825, and save the file." Prompt 2: "Update the sales tax rate in <code>src/pricing.py</code> from 7% to 8.25%. Confirm the rate is applied everywhere it\'s currently hardcoded in this file (there may be more than one place), and report every location you changed." A refactor merged the day before moved the tax constant to a different line, and, unknown to the coordinator, a second hardcoded 0.07 was introduced elsewhere in the same file as a temporary workaround. Which prompt is more likely to complete the task correctly, and why?',
+   opts: [
+     'Prompt 1, because giving an exact line number leaves no room for the subagent to make a mistake.',
+     'Prompt 2, because it states the actual goal -- the correct tax rate applied everywhere it\'s hardcoded -- rather than a specific location, so the subagent\'s own investigation finds and fixes both instances even though the coordinator\'s assumption about "where" is now stale, and its reporting requirement gives the coordinator visibility into exactly what changed.',
+     'They\'re equivalent, since both eventually result in the constant being changed to 0.0825.',
+     'Prompt 1 is safer, because changing only one line makes it less likely to touch anything unintended.',
+   ], correct: 1,
+   why: 'B is correct for the reason that actually matters here: the coordinator\'s information about WHERE the constant lives is now wrong -- procedural instructions bake in exactly the kind of assumption that goes stale -- and Prompt 1\'s rigid, location-based instruction has no path to noticing or handling the second hardcoded value at all. Worst case, it "succeeds" at the literal instruction while leaving the actual bug (an inconsistent tax rate) in place. Prompt 2 states the outcome plus an explicit completeness check ("everywhere it\'s hardcoded"), so the subagent\'s own investigation finds both locations regardless of what moved. A\'s reasoning is backwards -- an exact-but-wrong instruction doesn\'t reduce mistakes, it guarantees one once the assumption behind it is stale. C ignores that Prompt 1 provably misses the second occurrence in this scenario. D\'s safety argument collapses once the location assumption itself is wrong: Prompt 1 isn\'t safely narrow, it\'s confidently pointed at incomplete information.'},
 ];
 
 function mpQuizMini(tag){
@@ -3147,6 +3167,194 @@ function renderMP3(){
   mpQuizMini('mp3');
 }
 
+function mpComplaintDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:135px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Procedural -- fixed steps', [
+      box('complaint<br>comes in'), box('step 1:<br>apologize'), box('step 2:<br>10% refund'),
+      box('step 3:<br>log resolved'),
+    ], 'Works fine until the complaint doesn\'t match the script -- then it breaks or misapplies', false)+
+    row('Goal-oriented, no boundaries', [
+      box('complaint<br>comes in'), box('told: "make the<br>customer happy"'),
+      box('free to do<br>anything'), box('gives away a free<br>year of service'),
+    ], 'It adapts -- but the manager has zero visibility or control until it\'s already done', false)+
+    row('Goal-oriented WITH constraints', [
+      box('complaint<br>comes in'), box('told:', ['customer satisfied', 'cost under $50', 'normal policies', 'log what + why']),
+      box('adapts freely<br>within those bounds'), box('manager sees the log,<br>cost stayed capped'),
+    ], 'Adaptive AND the manager kept visibility and control', true)+
+  '</div>';
+}
+
+function mpDelegationDiagramHTML(){
+  const box = (label, sub) =>
+    '<div style="border:1px solid var(--hair);border-radius:8px;background:var(--card);padding:10px 12px;min-width:150px;flex-shrink:0;">'+
+    '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11.5px;color:var(--ink-soft);">'+label+'</div>'+
+    (sub ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:4px;">'+
+      sub.map(s => '<div style="background:var(--accentbg);color:var(--accent);border-radius:5px;padding:3px 7px;font-family:\'IBM Plex Mono\',monospace;font-size:11px;">'+s+'</div>').join('')+
+      '</div>' : '')+
+    '</div>';
+  const arrow = '<div style="color:var(--ink-soft);font-size:18px;padding:0 6px;flex-shrink:0;">&rarr;</div>';
+  const row = (title, boxes, badge, badgeGood) =>
+    '<div style="margin:14px 0;">'+
+    '<div style="font-size:12px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;">'+title+'</div>'+
+    '<div style="display:flex;align-items:center;overflow-x:auto;padding-bottom:4px;">'+boxes.join(arrow)+'</div>'+
+    '<div style="margin-top:8px;display:inline-block;background:var('+(badgeGood?'--goodbg':'--badbg')+');color:var('+(badgeGood?'--good':'--bad')+');border-radius:6px;padding:4px 10px;font-size:12px;">'+badge+'</div>'+
+    '</div>';
+  return '<div class="card" style="padding:16px 18px;">'+
+    row('Procedural Agent prompt', [
+      box('"open file X,<br>line 40, replace<br>with Y"'), box('subagent follows<br>the literal steps'),
+      box('file already changed --<br>steps don\'t match reality'), box('breaks, or "succeeds"<br>at the wrong thing'),
+    ], 'No mechanism to notice or adapt when the assumption behind the steps is stale', false)+
+    row('Goal-oriented, unconstrained', [
+      box('"make the auth<br>tests pass"'), box('no maxTurns, no tool<br>scoping, no report<br>required'),
+      box('free rein --<br>touches anything'), box('coordinator has no idea<br>what actually happened'),
+    ], 'Adapts, but the coordinator lost visibility and control to get it', false)+
+    row('Goal-oriented + structural controls', [
+      box('end state + check +<br>constraints, stated<br>in the prompt'), box('maxTurns cap,<br>tools scoped'),
+      box('adapts within<br>those bounds'), box('bounded, auditable<br>result, reported back'),
+    ], 'Adaptive AND the coordinator kept visibility and control', true)+
+  '</div>';
+}
+
+const CODE_MP4 = `# PROCEDURAL -- encodes the coordinator's current assumption about
+# WHERE the fix goes. Breaks silently if that assumption is stale.
+agent_prompt = "Open src/pricing.py, go to line 47, change the tax " \\
+               "rate constant from 0.07 to 0.0825, and save the file."
+
+# GOAL-ORIENTED, UNCONSTRAINED -- adapts, but nothing bounds it and
+# nothing requires it to report what it actually did.
+agent_prompt = "Fix the sales tax rate in src/pricing.py."
+
+# GOAL-ORIENTED + CONSTRAINTS -- states the end state, a stated check,
+# and explicit boundaries. Anthropic's own guidance for writing a good
+# /goal condition maps directly onto this: one measurable end state, a
+# stated check, and constraints that must not change.
+agent_prompt = """
+Update the sales tax rate in src/pricing.py from 7% to 8.25%.
+
+End state: every place this rate is hardcoded in this file uses 8.25%
+-- there may be more than one place, so search the file rather than
+assuming a single location.
+
+Constraints: modify only src/pricing.py. Don't touch any other file.
+
+Report: list every location you changed and why you were confident
+each one was the tax rate (not a coincidentally similar number).
+"""
+
+# Structural controls live in AgentDefinition, not the prompt text:
+AgentDefinition(
+    description="Fixes a specific, scoped bug given a clear end state.",
+    prompt=agent_prompt,
+    tools=["Read", "Edit", "Grep"],   # scoped -- no Bash, no Write elsewhere
+    max_turns=8,                      # bounded -- partial output, not a runaway
+)`;
+
+const PRICING_FILE_MP4 = `def normalize_tax(subtotal):
+    RATE = 0.07  # sales tax rate
+    return round(subtotal * (1 + RATE), 2)`;
+
+function buildMP4Prompt(procedural){
+  const header = 'Here is the current content of src/pricing.py:\n\n' + PRICING_FILE_MP4 + '\n\n';
+  if (procedural){
+    return header + 'Task: open src/pricing.py, go to line 47, and change the tax rate constant from 0.07 to '+
+      '0.0825. Make only that specific change.';
+  }
+  return header + 'Task: update the sales tax rate in src/pricing.py from 7% to 8.25%. Confirm the rate is '+
+    'applied everywhere it\'s hardcoded in this file (there may be more than one place). Modify only this file. '+
+    'Report every location you changed and why.';
+}
+
+async function runDelegationStyleLive(procedural, out){
+  out.clear();
+  const prompt = buildMP4Prompt(procedural);
+  out.log('> ' + (procedural ? '[procedural -- assumes line 47]' : '[goal-oriented -- states the end state + a completeness check]'), 'meta');
+  out.log(prompt);
+  out.log('');
+  out.log('… calling Claude as an isolated subagent (fresh call, no shared history)');
+  out.log('Note: the file above is only 3 lines long -- the procedural prompt\'s "line 47" and its assumption of one location are already wrong.', 'meta');
+  try {
+    const resp = await callClaude({messages: [{role: 'user', content: prompt}]});
+    const text = resp.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    out.log('');
+    out.log(text, procedural ? undefined : 'ok');
+  } catch (e){ out.log('✗ ' + friendlyError(e), 'err'); }
+}
+
+function renderMP4(){
+  return '<div class="taghead"><span class="pill">Masterpiece · MP-4</span></div>'+
+  '<h2>Goal-oriented vs. procedural subagent delegation</h2>'+
+  '<p class="dek">Objective: evaluate subagent delegation strategies -- goal-oriented versus procedural '+
+  'instructions -- and select the approach that enables adaptive behavior while maintaining coordinator '+
+  'visibility and control.</p>'+
+  '<p style="font-size:12px;color:var(--accent);margin:-6px 0 18px;">Domain 1 · Agentic Architecture &amp; '+
+  'Orchestration (tasks 1.2/1.3 -- delegation strategy, and 1.4 -- enforcement/handoff patterns).</p>'+
+  '<div class="card concept"><div class="kslabel">Knowledge</div><ul>'+
+  '<li><code>/goal</code> sets a completion condition for the <b>current session</b> and re-checks it via a separate, small fast-model evaluator after every turn -- if not yet met, Claude takes another turn instead of returning control to you. Documented as "a wrapper around a session-scoped prompt-based Stop hook," not a subagent-specific mechanism</li>'+
+  '<li>A good goal condition, per Anthropic\'s own guidance, has three parts: <b>one measurable end state</b>, <b>a stated check</b> Claude\'s own output can demonstrate, and <b>constraints that must not change</b> along the way -- this generalizes directly to writing a good goal-oriented subagent prompt, even outside <code>/goal</code> itself</li>'+
+  '<li><code>/goal</code>\'s visibility/control mechanisms are concrete and documented: the transcript shows every evaluator verdict as it happens, and if Claude stalls (no tool use for several turns), Claude Code stops the loop and returns control to you with the goal still set, rather than looping forever</li>'+
+  '<li><code>/goal</code> treats a running subagent as background work -- it skips evaluation while the subagent is running and evaluates once it finishes (with a check-in if it\'s still running after 30 minutes). It does not supervise a subagent\'s progress from the inside</li>'+
+  '<li>For subagents specifically, the structural control levers live in <code>AgentDefinition</code>: <code>maxTurns</code> stops it and marks output partial rather than letting it run unbounded (resumable via its <code>agentId</code>), the <code>tools</code> field scopes what it can touch at all, and query-level <code>maxBudgetUsd</code> plus the depth/concurrency env vars bound the whole delegation tree -- none of these dictate the subagent\'s steps, all of them bound its freedom</li>'+
+  '<li>A purely procedural instruction encodes the coordinator\'s <i>current</i> assumptions about the world -- an exact file, line, or value -- directly into the steps. When that assumption goes stale (the same failure mode covered in MP-2\'s session-resumption topic), a rigid procedure has no mechanism to notice or adapt; a goal stated as an end state lets the subagent\'s own investigation route around it</li></ul>'+
+  '<div class="kslabel">Skills</div><ul>'+
+  '<li>Frame a subagent\'s task as the end state plus a way to verify it, not a fixed sequence of steps -- unless the steps themselves genuinely can\'t vary (a deploy script that must run in an exact order, for example)</li>'+
+  '<li>Pair every goal-oriented instruction with explicit constraints -- "touch only these files," "don\'t exceed $X," "use only what\'s given" -- adaptive freedom in HOW should never mean freedom in WHAT\'S in scope</li>'+
+  '<li>Require an explicit report of what was actually done and why, in the subagent\'s final message -- it\'s the only visibility the coordinator gets, since intermediate steps never cross back (established in MP-3)</li>'+
+  '<li>Bound adaptive delegation structurally, not just by asking nicely: set <code>maxTurns</code>, scope <code>tools</code>, and use budget/concurrency caps for anything that could plausibly run away</li>'+
+  '<li>Reserve purely procedural instructions for genuinely mechanical, assumption-free steps; reach for goal-oriented instructions whenever the coordinator\'s picture of the current state might already be incomplete or stale</li></ul></div>'+
+  '<h3>Simpler version: training a new employee to handle complaints</h3>'+
+  '<div class="card" style="padding:16px 18px;">'+
+  '<p>You could hand a new hire a script: apologize, offer a 10% refund, log it resolved. Precise, easy to '+
+  'check they followed it -- and useless the moment a customer wants a replacement instead of a refund, '+
+  'because the script has no branch for that.</p>'+
+  '<p>Or you could just say "make the customer happy" and walk away. Now they can adapt to whatever the '+
+  'customer actually needs -- but you\'ve also handed over a blank check with no visibility into what they\'ll '+
+  'do until it\'s already done.</p>'+
+  '<p>The version that actually works: state the outcome, the boundary, and what you need to see afterward. '+
+  '"Get the customer to a resolution they\'re satisfied with, keep the cost under $50, stay within our normal '+
+  'policies, and tell me what you did and why." Now they can adapt to the real situation, and you still know '+
+  'exactly what happened and that it stayed inside the fence you drew.</p>'+
+  '</div>'+
+  mpComplaintDiagramHTML()+
+  '<h3>The same tradeoff, in subagent terms</h3>'+mpDelegationDiagramHTML()+
+  '<h3>Run it for real</h3>'+liveRunHTML({
+    title: 'A stale assumption, two delegation styles -- live.',
+    body: 'Both calls get the exact same (tiny, deliberately mismatched) file content. The procedural prompt '+
+      'assumes a specific line number that doesn\'t exist in a 3-line file; the goal-oriented prompt states '+
+      'the outcome and a completeness check instead. Watch how each one handles the mismatch.',
+    controlsHTML: '<button class="run" id="mp4-procedural">&#9654; Run procedural prompt</button>'+
+      '<button class="run" id="mp4-goal">&#9654; Run goal-oriented prompt</button>',
+    consoleId: 'mp4-console',
+  })+
+  '<h3>Constructing the prompt -- and the structural controls around it</h3>'+
+  '<div class="card">'+cliCardHTML({
+    title: 'Procedural vs. unconstrained-goal vs. goal + constraints',
+    body: 'The middle version is the trap: goal-oriented alone isn\'t the answer, goal-oriented WITH constraints and structural bounds is.',
+    code: CODE_MP4,
+  })+'</div>'+
+  '<div class="note-inline"><b>Source-checked:</b> <code>/goal</code>\'s mechanics (session-scoped Stop-hook '+
+  'wrapper, the evaluator\'s verdicts and stall-detection behavior, its condition-writing guidance, and how it '+
+  'treats a running subagent as background work) and the <code>AgentDefinition</code> control fields '+
+  '(<code>maxTurns</code>, <code>tools</code>, budget/depth/concurrency caps) are verified against Anthropic\'s '+
+  'current Claude Code and Agent SDK documentation, not recalled from memory. The mapping from <code>/goal</code>\'s '+
+  'condition-writing rules onto subagent-prompt construction is this app\'s own synthesis, not a verbatim doc '+
+  'claim -- flagged as such rather than presented as more official than it is.</div>'+
+  mpQuizMini('mp4');
+}
+
 const RENDERERS = {
   overview: renderOverview, t11: renderT11, t12: renderT12, t14: renderT14,
   t16: renderT16, t17: renderT17, capstones: renderCapstones,
@@ -3155,7 +3363,7 @@ const RENDERERS = {
   t41: renderT41, t43: renderT43, t45: renderT45, t46: renderT46,
   t51: renderT51, t52: renderT52, t53: renderT53, t55: renderT55,
   quiz: renderQuiz, mockexam: renderMockExam,
-  'mp-hub': renderMasterpieceHub, mp1: renderMP1, mp2: renderMP2, mp3: renderMP3,
+  'mp-hub': renderMasterpieceHub, mp1: renderMP1, mp2: renderMP2, mp3: renderMP3, mp4: renderMP4,
 };
 
 /* =========================================================================
@@ -3828,6 +4036,11 @@ function attachLiveRunners(id){
     const out = () => liveConsole('mp3-console');
     document.getElementById('mp3-vague').onclick = runBtnGuard('mp3-vague', () => runSubagentPromptLive(false, out()));
     document.getElementById('mp3-complete').onclick = runBtnGuard('mp3-complete', () => runSubagentPromptLive(true, out()));
+  }
+  if (id === 'mp4'){
+    const out = () => liveConsole('mp4-console');
+    document.getElementById('mp4-procedural').onclick = runBtnGuard('mp4-procedural', () => runDelegationStyleLive(true, out()));
+    document.getElementById('mp4-goal').onclick = runBtnGuard('mp4-goal', () => runDelegationStyleLive(false, out()));
   }
 }
 
